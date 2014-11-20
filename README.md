@@ -1,5 +1,7 @@
 # PHP Extension for jq
 
+[![Build Status](https://secure.travis-ci.org/kjdev/php-ext-jq.png?branch=master)](http://travis-ci.org/kjdev/php-ext-jq)
+
 This extension allows [jq](http://stedolan.github.io/jq).
 
 ## Build
