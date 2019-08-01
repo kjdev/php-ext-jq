@@ -19,10 +19,15 @@ zend_class_entry *php_jq_ce;
 static zend_object_handlers php_jq_handlers;
 
 typedef struct {
+#ifndef ZEND_ENGINE_3
     zend_object std;
+#endif
     jq_state *jq;
     jv json;
     int loaded;
+#ifdef ZEND_ENGINE_3
+    zend_object std;
+#endif
 } php_jq_t;
 
 #define PHP_JQ_METHOD(name) \
@@ -72,8 +77,13 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_parsefile, 0, 0, 2)
     ZEND_ARG_INFO(0, flags)
 ZEND_END_ARG_INFO()
 
+#ifdef ZEND_ENGINE_3
+#define PHP_JQ_OBJ(self, obj) \
+    self = (php_jq_t *)((char *)Z_OBJ_P(obj) - XtOffsetOf(php_jq_t, std))
+#else
 #define PHP_JQ_OBJ(self, obj) \
     self = (php_jq_t *)zend_object_store_get_object(obj TSRMLS_CC)
+#endif
 
 enum {
     JQ_OPT_RAW = 1
@@ -127,7 +137,11 @@ PHP_JQ_METHOD(__construct)
 PHP_JQ_METHOD(load)
 {
     char *str;
+#ifdef ZEND_ENGINE_3
+    size_t str_len;
+#else
     int str_len;
+#endif
     php_jq_t *intern;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s",
@@ -163,10 +177,15 @@ PHP_JQ_METHOD(load)
 PHP_JQ_METHOD(loadFile)
 {
     char *filename;
+#ifdef ZEND_ENGINE_3
+    size_t filename_len;
+    zend_string *contents = NULL;
+#else
     int filename_len;
+    char *contents = NULL;
+#endif
     int len;
     long maxlen = PHP_STREAM_COPY_ALL;
-    char *contents = NULL;
     php_stream *stream;
     php_jq_t *intern;
 
@@ -193,6 +212,30 @@ PHP_JQ_METHOD(loadFile)
         RETURN_FALSE;
     }
 
+#ifdef ZEND_ENGINE_3
+    contents = php_stream_copy_to_mem(stream, maxlen, 0);
+    if (contents) {
+        if (ZSTR_LEN(contents) > 0) {
+            intern->json = jv_parse_sized(ZSTR_VAL(contents),
+                                          ZSTR_LEN(contents));
+            if (jv_is_valid(intern->json)) {
+                intern->loaded = 1;
+                RETVAL_TRUE;
+            } else {
+                if (PHP_JQ_G(display_errors)) {
+                    PHP_JQ_ERR(E_WARNING, "load json parse error");
+                }
+                jv_free(intern->json);
+                RETVAL_FALSE;
+            }
+        } else {
+            RETVAL_FALSE;
+        }
+        zend_string_release(contents);
+    } else {
+        RETVAL_FALSE;
+    }
+#else
     if ((len = php_stream_copy_to_mem(stream, &contents, maxlen, 0)) > 0) {
         intern->json = jv_parse_sized(contents, len);
         if (jv_is_valid(intern->json)) {
@@ -212,6 +255,7 @@ PHP_JQ_METHOD(loadFile)
     if (contents) {
         efree(contents);
     }
+#endif
 
     php_stream_close(stream);
 }
@@ -228,20 +272,28 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
             }
             break;
         case JV_KIND_NULL:
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             ZVAL_NULL(*return_value);
             break;
         case JV_KIND_FALSE:
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             ZVAL_BOOL(*return_value, 0);
             break;
         case JV_KIND_TRUE:
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             ZVAL_BOOL(*return_value, 1);
             break;
         case JV_KIND_NUMBER: {
             double d = jv_number_value(x);
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             if (d != d || d > LONG_MAX || d < LONG_MIN) {
                 ZVAL_DOUBLE(*return_value, jv_number_value(x));
             } else if (d == (long)d) {
@@ -253,17 +305,25 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
         }
         case JV_KIND_STRING: {
             int len = jv_string_length_bytes(jv_copy(x));
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             if (len <= 0) {
                 ZVAL_EMPTY_STRING(*return_value);
             } else {
+#ifdef ZEND_ENGINE_3
+                ZVAL_STRINGL(*return_value, jv_string_value(x), len);
+#else
                 ZVAL_STRINGL(*return_value, jv_string_value(x), len, 1);
+#endif
             }
             break;
         }
         case JV_KIND_ARRAY: {
             int i, len = jv_array_length(jv_copy(x));
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             array_init(*return_value);
             if (len == 0) {
                 break;
@@ -272,11 +332,18 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
             for (i = 0; i < len; i++) {
                 jv value = jv_array_get(jv_copy(x), i);
                 if (jv_is_valid(value)) {
+#ifdef ZEND_ENGINE_3
+                    zval zv, *p = &zv;
+                    php_jv_dump(&p, value TSRMLS_CC);
+                    zend_hash_next_index_insert_new(Z_ARRVAL_P(*return_value),
+                                                    &zv);
+#else
                     zval *zv;
                     ALLOC_INIT_ZVAL(zv);
                     php_jv_dump(&zv, value TSRMLS_CC);
                     zend_hash_next_index_insert(Z_ARRVAL_PP(return_value),
                                                 &zv, sizeof(zv), NULL);
+#endif
                 } else {
                     jv_free(value);
                 }
@@ -285,7 +352,9 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
         }
         case JV_KIND_OBJECT: {
             int i = 0, first = 1;
+#ifndef ZEND_ENGINE_3
             INIT_PZVAL(*return_value);
+#endif
             array_init(*return_value);
             if (jv_object_length(jv_copy(x)) == 0) {
                 break;
@@ -293,7 +362,9 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
 
             while (1) {
                 jv key, value;
-                zval *zv;
+#ifdef ZEND_ENGINE_3
+                zval zv, *p = &zv;
+                zend_string *jv_key;
 
                 if (first) {
                     i = jv_object_iter(x);
@@ -307,6 +378,30 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
                 key = jv_object_iter_key(x, i);
                 value = jv_object_iter_value(x, i);
 
+                php_jv_dump(&p, value TSRMLS_CC);
+
+                jv_key = zend_string_init(jv_string_value(key),
+                                          jv_string_length_bytes(jv_copy(key)),
+                                          0);
+                zend_symtable_update(Z_ARRVAL_P(*return_value), jv_key, &zv);
+                zend_string_release(jv_key);
+
+                first = 0;
+                jv_free(key);
+#else
+                zval *zv;
+
+                if (first) {
+                    i = jv_object_iter(x);
+                } else {
+                    i = jv_object_iter_next(x, i);
+                }
+                if (!jv_object_iter_valid(x, i)) {
+                    break;
+                }
+
+                key = jv_object_iter_key(x, i);
+                value = jv_object_iter_value(x, i);
                 ALLOC_INIT_ZVAL(zv);
                 php_jv_dump(&zv, value TSRMLS_CC);
                 zend_symtable_update(Z_ARRVAL_PP(return_value),
@@ -316,6 +411,7 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
 
                 first = 0;
                 jv_free(key);
+#endif
             }
         }
     }
@@ -333,6 +429,39 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags TSRMLS_DC)
     if (jv_is_valid(result = jq_next(jq))) {
         int multiple = 0;
         while (1) {
+#ifdef ZEND_ENGINE_3
+            zval zv, *p = &zv;
+            if (flags == JQ_OPT_RAW) {
+                if (jv_get_kind(result) == JV_KIND_STRING) {
+                    ZVAL_STRING(&zv, jv_string_value(result));
+                } else {
+                    jv dump = jv_dump_string(result, 0);
+                    if (jv_is_valid(dump)) {
+                        ZVAL_STRING(&zv, jv_string_value(dump));
+                    }
+                    jv_free(dump);
+                }
+            } else {
+                php_jv_dump(&p, result TSRMLS_CC);
+            }
+
+            if (!jv_is_valid(result = jq_next(jq))) {
+                if (multiple) {
+                    zend_hash_next_index_insert_new(Z_ARRVAL_P(*return_value),
+                                                    &zv);
+                } else {
+                    ZVAL_ZVAL(*return_value, &zv, 1, 1);
+                }
+                break;
+            }
+
+            if (!multiple) {
+                multiple = 1;
+                array_init(*return_value);
+            }
+
+            zend_hash_next_index_insert_new(Z_ARRVAL_P(*return_value), &zv);
+#else
             zval *zv;
 
             ALLOC_INIT_ZVAL(zv);
@@ -368,6 +497,7 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags TSRMLS_DC)
 
             zend_hash_next_index_insert(Z_ARRVAL_PP(return_value),
                                         &zv, sizeof(zv), NULL);
+#endif
         }
     } else {
         jv_free(result);
@@ -381,8 +511,13 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags TSRMLS_DC)
 PHP_JQ_METHOD(filter)
 {
     char *str;
+#ifdef ZEND_ENGINE_3
+    size_t str_len;
+    zend_long flags = 0;
+#else
     int str_len;
     long flags = 0;
+#endif
     jv result;
     php_jq_t *intern;
 
@@ -463,8 +598,13 @@ php_jq_exec(zval **return_value,
 PHP_JQ_METHOD(parse)
 {
     char *str, *filter;
+#ifdef ZEND_ENGINE_3
+    size_t str_len, filter_len;
+    zend_long flags = 0;
+#else
     int str_len, filter_len;
     long flags = 0;
+#endif
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
                               &str, &str_len, &filter, &filter_len,
@@ -483,11 +623,17 @@ PHP_JQ_METHOD(parse)
 PHP_JQ_METHOD(parseFile)
 {
     char *filename, *filter;
+#ifdef ZEND_ENGINE_3
+    size_t filename_len, filter_len;
+    zend_long flags = 0;
+    zend_string *contents = NULL;
+#else
     int filename_len, filter_len;
     long flags = 0;
+    char *contents = NULL;
+#endif
     int len;
     long maxlen = PHP_STREAM_COPY_ALL;
-    char *contents = NULL;
     php_stream *stream;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
@@ -507,6 +653,20 @@ PHP_JQ_METHOD(parseFile)
         RETURN_FALSE;
     }
 
+#ifdef ZEND_ENGINE_3
+    contents = php_stream_copy_to_mem(stream, maxlen, 0);
+    if (contents) {
+        if (ZSTR_LEN(contents) > 0) {
+            php_jq_exec(&return_value, ZSTR_VAL(contents), ZSTR_LEN(contents),
+                        filter, filter_len, flags TSRMLS_CC);
+        } else {
+            RETVAL_FALSE;
+        }
+        zend_string_release(contents);
+    } else {
+        RETVAL_FALSE;
+    }
+#else
     if ((len = php_stream_copy_to_mem(stream, &contents, maxlen, 0)) > 0) {
         php_jq_exec(&return_value, contents, len,
                     filter, filter_len, flags TSRMLS_CC);
@@ -517,6 +677,7 @@ PHP_JQ_METHOD(parseFile)
     if (contents) {
         efree(contents);
     }
+#endif
 
     php_stream_close(stream);
 }
@@ -536,6 +697,56 @@ static zend_function_entry php_jq_methods[] = {
     ZEND_FE_END
 };
 
+#ifdef ZEND_ENGINE_3
+static void
+php_jq_free_storage(zend_object *std)
+{
+    php_jq_t *intern;
+    intern = (php_jq_t *)((char *)std - XtOffsetOf(php_jq_t, std));
+    if (!intern) {
+        return;
+    }
+
+    if (intern->loaded) {
+        jv_free(intern->json);
+    }
+
+    if (intern->jq) {
+        jq_teardown(&intern->jq);
+    }
+
+    zend_object_std_dtor(std);
+}
+
+static zend_object *
+php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr TSRMLS_DC)
+{
+    php_jq_t *intern;
+
+    intern = ecalloc(1, sizeof(php_jq_t)+zend_object_properties_size(ce));
+    if (ptr) {
+        *ptr = intern;
+    }
+
+    zend_object_std_init(&intern->std, ce);
+    object_properties_init(&intern->std, ce);
+    rebuild_object_properties(&intern->std);
+
+    intern->std.handlers = &php_jq_handlers;
+
+    intern->jq = NULL;
+    intern->loaded = 0;
+
+    return &intern->std;
+}
+
+static zend_object *
+php_jq_new(zend_class_entry *ce TSRMLS_DC)
+{
+    return php_jq_new_ex(ce, NULL TSRMLS_CC);
+}
+
+#else
 static void
 php_jq_free_storage(void *object TSRMLS_DC)
 {
@@ -597,6 +808,7 @@ php_jq_new(zend_class_entry *ce TSRMLS_DC)
 {
     return php_jq_new_ex(ce, NULL TSRMLS_CC);
 }
+#endif
 
 static void
 jq_init_globals(zend_jq_globals *jq_globals)
@@ -621,6 +833,11 @@ ZEND_MINIT_FUNCTION(jq)
     memcpy(&php_jq_handlers, zend_get_std_object_handlers(),
            sizeof(zend_object_handlers));
 
+#ifdef ZEND_ENGINE_3
+    php_jq_handlers.offset = XtOffsetOf(php_jq_t, std);
+    php_jq_handlers.dtor_obj = zend_objects_destroy_object;
+    php_jq_handlers.free_obj = php_jq_free_storage;
+#endif
     php_jq_handlers.clone_obj = NULL;
 
     /* class constant */
