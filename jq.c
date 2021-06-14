@@ -96,7 +96,7 @@ php_jq_err_cb(void *data, jv err)
     if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
         jv dump = jv_dump_string(jv_copy(err), 0);
         if (jv_is_valid(dump)) {
-            PHP_JQ_ERR(E_WARNING, jv_string_value(dump));
+            PHP_JQ_ERR(E_WARNING, "%s", jv_string_value(dump));
         }
         jv_free(dump);
     }
