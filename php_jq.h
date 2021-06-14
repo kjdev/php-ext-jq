@@ -1,7 +1,7 @@
 #ifndef PHP_JQ_H
 #define PHP_JQ_H
 
-#define PHP_JQ_EXT_VERSION "0.1.0"
+#define PHP_JQ_EXT_VERSION "0.1.1"
 
 extern zend_module_entry jq_module_entry;
 #define phpext_jq_ptr &jq_module_entry
