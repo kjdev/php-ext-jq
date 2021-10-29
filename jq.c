@@ -11,7 +11,6 @@
 #include "php_jq.h"
 
 #include "jq.h"
-#include "version.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(jq)
 
@@ -861,7 +860,6 @@ ZEND_MINFO_FUNCTION(jq)
     php_info_print_table_start();
     php_info_print_table_row(2, "jq support", "enabled");
     php_info_print_table_row(2, "Extension Version", PHP_JQ_EXT_VERSION);
-    php_info_print_table_row(2, "jq version", JQ_VERSION);
     php_info_print_table_end();
 
     DISPLAY_INI_ENTRIES();

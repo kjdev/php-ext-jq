@@ -11,5 +11,4 @@ jq
 
 jq support => enabled
 Extension Version => %d.%d.%d
-jq version => %d.%d
 %a
