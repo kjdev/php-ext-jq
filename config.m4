@@ -26,24 +26,64 @@ if test $PHP_MAJOR_VERSION -eq 5 -a $PHP_MINOR_VERSION -lt 3; then
 fi
 
 dnl jq Extension
-PHP_ARG_ENABLE(jq, whether to enable jq support,
-[  --enable-jq      Enable jq support])
+PHP_ARG_WITH([jq],
+    [for jq support],
+    [AS_HELP_STRING([--with-jq], [Include jq support])])
+
+dnl coverage
+PHP_ARG_ENABLE([jq-coverage],
+    [whether to enable jq coverage support],
+    [AS_HELP_STRING([--enable-jq-coverage], [Enable coverage support])],
+    [no],
+    [no])
 
 if test "$PHP_JQ" != "no"; then
 
-    dnl Source jq
-    PHP_ADD_INCLUDE("jq/")
-    JQ_SOURCE="jq/locfile.c jq/bytecode.c jq/compile.c jq/execute.c jq/builtin.c jq/jv.c jq/jv_parse.c jq/jv_print.c jq/jv_dtoa.c jq/jv_unicode.c jq/jv_aux.c jq/jv_file.c jq/jv_alloc.c jq/lexer.c jq/parser.c"
+    dnl check with-path
+    SEARCH_PATH="/usr/local /usr"
+    SEARCH_FOR="/include/jq.h"
+    if test -r $PHP_JQ/$SEARCH_FOR; then
+      JQ_DIR=$PHP_JQ
+    else
+      AC_MSG_CHECKING([for jq files in default path])
+      for i in $SEARCH_PATH ; do
+        if test -r $i/$SEARCH_FOR; then
+          JQ_DIR=$i
+          AC_MSG_RESULT(found in $i)
+        fi
+      done
+    fi
 
-    dnl PHP Extension
-    PHP_NEW_EXTENSION(jq, jq.c $JQ_SOURCE, $ext_shared)
-fi
+    if test -z "$JQ_DIR"; then
+      AC_MSG_RESULT([not found])
+      AC_MSG_ERROR([Please reinstall the jq development files])
+    fi
 
-dnl coverage
-PHP_ARG_ENABLE(coverage, whether to enable coverage support,
-[  --enable-coverage     Enable coverage support], no, no)
+    dnl add include path
+    PHP_ADD_INCLUDE($JQ_DIR/include)
 
-if test "$PHP_COVERAGE" != "no"; then
-    EXTRA_CFLAGS="--coverage"
-    PHP_SUBST(EXTRA_CFLAGS)
+    dnl check for lib and symbol presence
+    LIBNAME=jq
+    LIBSYMBOL=jq_init
+
+    PHP_CHECK_LIBRARY($LIBNAME, $LIBSYMBOL,
+    [
+      PHP_ADD_LIBRARY_WITH_PATH($LIBNAME, $JQ_DIR/$PHP_LIBDIR, JQ_SHARED_LIBADD)
+      AC_DEFINE(HAVE_JQ_FEATURE, 1, [ ])
+    ],[
+      AC_MSG_ERROR([FEATURE not supported by your jq library.])
+    ],[
+      -L$JQ_DIR/$PHP_LIBDIR
+    ])
+
+    PHP_SUBST(JQ_SHARED_LIBADD)
+
+    AC_DEFINE(HAVE_JQ, 1, [ Have jq support ])
+
+    PHP_NEW_EXTENSION(jq, jq.c, $ext_shared)
+
+    if test "$PHP_JQ_COVERAGE" != "no"; then
+        EXTRA_CFLAGS="--coverage"
+        PHP_SUBST(EXTRA_CFLAGS)
+    fi
 fi
