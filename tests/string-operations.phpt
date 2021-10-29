@@ -10,9 +10,6 @@ $data = array(
     array('[.[]|endswith("foo")]', '["fo", "foo", "barfoo", "foobar", "barfoob"]'),
     array('[.[]|ltrimstr("foo")]', '["fo", "foo", "barfoo", "foobar", "afoo"]'),
     array('[.[]|rtrimstr("foo")]', '["fo", "foo", "barfoo", "foobar", "foob"]'),
-    array('.[","]', '"a,bc,def,ghij,klmno"'),
-    array('.[", "]', '"a,bc,def,ghij,klmno"'),
-    array('.[", "]', '"a,b,, c, d,ef, , ghi, jklmn, o"'),
     array('[(index(","), rindex(",")), indices(",")]', '"a,bc,def,ghij,klmno"'),
     array('indices(1)', '[0,1,1,2,3,4,1,5]'),
     array('indices([1,2])', '[0,1,2,3,1,4,2,5,1,2,6,7]'),
@@ -111,38 +108,6 @@ array(5) {
   string(4) "foob"
 }
 string(31) "["fo","","bar","foobar","foob"]"
-== .[","]
-array(4) {
-  [0]=>
-  int(1)
-  [1]=>
-  int(4)
-  [2]=>
-  int(8)
-  [3]=>
-  int(13)
-}
-string(10) "[1,4,8,13]"
-== .[", "]
-array(0) {
-}
-string(2) "[]"
-== .[", "]
-array(6) {
-  [0]=>
-  int(4)
-  [1]=>
-  int(7)
-  [2]=>
-  int(13)
-  [3]=>
-  int(15)
-  [4]=>
-  int(20)
-  [5]=>
-  int(27)
-}
-string(17) "[4,7,13,15,20,27]"
 == [(index(","), rindex(",")), indices(",")]
 array(3) {
   [0]=>
