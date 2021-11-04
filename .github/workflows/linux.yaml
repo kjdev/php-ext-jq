@@ -40,7 +40,7 @@ jobs:
       - name: Prepare required command
         run: |
           apk upgrade --no-cache
-          apk add --no-cache autoconf bison flex gcc git libtool make musl-dev
+          apk add --no-cache autoconf bison flex gcc git jq-dev libtool make musl-dev
       - name: Checkout repository
         uses: actions/checkout@v2
 
