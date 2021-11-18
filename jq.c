@@ -7,12 +7,28 @@
 #include "ext/standard/info.h"
 #include "ext/standard/php_array.h"
 #include "Zend/zend_exceptions.h"
+#include "Zend/zend_interfaces.h"
 
 #include "php_jq.h"
 
 #include "jq.h"
 
 ZEND_DECLARE_MODULE_GLOBALS(jq)
+
+/* For compatibility with older PHP versions */
+#ifndef ZEND_PARSE_PARAMETERS_NONE
+#define ZEND_PARSE_PARAMETERS_NONE()  \
+    ZEND_PARSE_PARAMETERS_START(0, 0) \
+    ZEND_PARSE_PARAMETERS_END()
+#endif
+#if PHP_VERSION_ID < 70300
+static void *zend_object_alloc(size_t obj_size, zend_class_entry *class_type)
+{
+    void *obj = emalloc(obj_size + zend_object_properties_size(class_type));
+    memset(obj, 0, obj_size - sizeof(zval));
+    return obj;
+}
+#endif
 
 #define PHP_JQ_NS "Jq"
 
@@ -581,11 +597,201 @@ php_jq_new(zend_class_entry *ce)
 
 static zend_class_entry *zend_jq_exception_ce;
 
+static zend_class_entry *zend_jq_run_ce;
+static zend_object_handlers zend_jq_run_handlers;
+typedef struct {
+    zend_object std;
+} zend_jq_run;
+
+static int php_jq_load_file(jv *var, const char *file)
+{
+    long maxlen = PHP_STREAM_COPY_ALL;
+    php_stream *stream;
+    zend_string *contents;
+
+    stream = php_stream_open_wrapper_ex(file, "rb", REPORT_ERRORS, NULL, NULL);
+    if (!stream) {
+        return FAILURE;
+    }
+
+    contents = php_stream_copy_to_mem(stream, maxlen, 0);
+    if (!contents) {
+        php_stream_close(stream);
+        return FAILURE;
+    }
+    if (ZSTR_LEN(contents) == 0) {
+        *var = jv_string_empty(0);
+    } else {
+        *var = jv_parse_sized(ZSTR_VAL(contents), ZSTR_LEN(contents));
+    }
+
+    zend_string_release(contents);
+    php_stream_close(stream);
+
+    return SUCCESS;
+}
+
+#ifndef ZEND_NS_MN
+#define ZEND_NS_MN(ns, name) zim_##ns_##name
+#endif
+#ifndef ZEND_NS_ME
+#define ZEND_NS_ME(ns, classname, name, arg_info, flags) ZEND_FENTRY(name, ZEND_NS_MN(ns, classname##_##name), arg_info, flags)
+#endif
+#ifndef ZEND_NS_METHOD
+#define ZEND_NS_METHOD(ns, classname, name) ZEND_NAMED_FUNCTION(ZEND_NS_MN(ns, classname##_##name))
+#endif
+
+#define PHP_JQ_HANDLER(type, obj) (type *)((char *)obj - XtOffsetOf(type, std))
+
+/* Run */
+ZEND_BEGIN_ARG_INFO(arginfo_jq_run_construct, 0)
+ZEND_END_ARG_INFO()
+ZEND_NS_METHOD(##PHP_JQ_NS, Run, __construct)
+{
+    ZEND_PARSE_PARAMETERS_NONE();
+}
+
+ZEND_BEGIN_ARG_INFO(arginfo_jq_run_fromstring, 2)
+    ZEND_ARG_INFO(0, text)
+    ZEND_ARG_INFO(0, filter)
+    ZEND_ARG_INFO(0, flags)
+ZEND_END_ARG_INFO()
+ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromString)
+{
+    char *filter, *text;
+    jq_state *state;
+    jv json;
+    size_t filter_len, text_len;
+    zend_long flags = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 3)
+        Z_PARAM_STRING(text, text_len)
+        Z_PARAM_STRING(filter, filter_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(flags)
+    ZEND_PARSE_PARAMETERS_END();
+
+    json = jv_parse_sized(text, text_len);
+    if (!jv_is_valid(json)) {
+        jv_free(json);
+        zend_throw_error(zend_jq_exception_ce, "failed to load json.");
+        RETURN_FALSE;
+    }
+
+    filter[filter_len] = 0;
+
+    state = jq_init();
+
+    if (!jq_compile(state, filter)) {
+        jv_free(json);
+        jq_teardown(&state);
+        zend_throw_error(zend_jq_exception_ce,
+                         "failed to compile filter string.");
+        RETURN_FALSE;
+    }
+
+    php_jq_filter(&return_value, state, json, flags);
+
+    jv_free(json);
+    jq_teardown(&state);
+}
+
+ZEND_BEGIN_ARG_INFO(arginfo_jq_run_fromfile, 2)
+    ZEND_ARG_INFO(0, file)
+    ZEND_ARG_INFO(0, filter)
+    ZEND_ARG_INFO(0, flags)
+ZEND_END_ARG_INFO()
+ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromFile)
+{
+    char *file, *filter;
+    jq_state *state;
+    jv json;
+    size_t file_len, filter_len;
+    zend_long flags = 0;
+
+    ZEND_PARSE_PARAMETERS_START(2, 3)
+        Z_PARAM_STRING(file, file_len)
+        Z_PARAM_STRING(filter, filter_len)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(flags)
+    ZEND_PARSE_PARAMETERS_END();
+
+    if (php_jq_load_file(&json, file) != SUCCESS) {
+        zend_throw_error(zend_jq_exception_ce, "failed to open file.");
+        RETURN_FALSE;
+    }
+    if (!jv_is_valid(json)) {
+        jv_free(json);
+        zend_throw_error(zend_jq_exception_ce, "failed to load json.");
+        RETURN_FALSE;
+    }
+
+    state = jq_init();
+
+    filter[filter_len] = 0;
+
+    if (!jq_compile(state, filter)) {
+        jv_free(json);
+        jq_teardown(&state);
+        zend_throw_error(zend_jq_exception_ce,
+                         "failed to compile filter string.");
+        RETURN_FALSE;
+    }
+
+    php_jq_filter(&return_value, state, json, flags);
+
+    jv_free(json);
+    jq_teardown(&state);
+}
+
+static zend_object *zend_jq_run_new(zend_class_entry *class_type)
+{
+    zend_jq_run *intern;
+
+    intern = zend_object_alloc(sizeof(zend_jq_run), class_type);
+
+    zend_object_std_init(&intern->std, class_type);
+    object_properties_init(&intern->std, class_type);
+
+    intern->std.handlers = &zend_jq_run_handlers;
+
+    return &intern->std;
+}
+
+static void zend_jq_run_free_storage(zend_object *object)
+{
+    zend_object_std_dtor(object);
+}
+
+static const zend_function_entry zend_jq_run_methods[] = {
+    ZEND_NS_ME(##PHP_JQ_NS, Run, __construct,
+               arginfo_jq_run_construct, ZEND_ACC_PRIVATE)
+    ZEND_NS_ME(##PHP_JQ_NS, Run, fromFile,
+               arginfo_jq_run_fromfile, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+    ZEND_NS_ME(##PHP_JQ_NS, Run, fromString,
+               arginfo_jq_run_fromstring, ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+    ZEND_FE_END
+};
+
 #define PHP_JQ_REGISTER_EXCEPTION_CLASS(name, class_name) \
     { \
         zend_class_entry ce; \
         INIT_NS_CLASS_ENTRY(ce, PHP_JQ_NS, #class_name, NULL); \
         zend_jq_##name##_ce = zend_register_internal_class_ex(&ce, zend_ce_error); \
+    }
+#define PHP_JQ_REGISTER_CLASS(name, class_name, flags) \
+    { \
+        zend_class_entry ce; \
+        INIT_NS_CLASS_ENTRY(ce, PHP_JQ_NS, #class_name, zend_jq_##name##_methods); \
+        zend_jq_##name##_ce = zend_register_internal_class_ex(&ce, NULL); \
+        zend_jq_##name##_ce->ce_flags |= flags; \
+        zend_jq_##name##_ce->create_object = zend_jq_##name##_new; \
+        zend_jq_##name##_ce->serialize = zend_class_serialize_deny; \
+        zend_jq_##name##_ce->unserialize = zend_class_unserialize_deny; \
+        memcpy(&zend_jq_##name##_handlers, &std_object_handlers, sizeof(zend_object_handlers)); \
+        zend_jq_##name##_handlers.offset = XtOffsetOf(zend_jq_##name, std); \
+        zend_jq_##name##_handlers.free_obj = zend_jq_##name##_free_storage; \
+        zend_jq_##name##_handlers.clone_obj = NULL; \
     }
 
 static void
@@ -617,6 +823,7 @@ ZEND_MINIT_FUNCTION(jq)
     php_jq_handlers.clone_obj = NULL;
 
     PHP_JQ_REGISTER_EXCEPTION_CLASS(exception, Exception);
+    PHP_JQ_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
 
     /* class constant */
     PHP_JQ_CONST_LONG(RAW, JQ_OPT_RAW);
