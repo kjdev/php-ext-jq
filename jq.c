@@ -14,6 +14,8 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(jq)
 
+#define PHP_JQ_NS "Jq"
+
 zend_class_entry *php_jq_ce;
 static zend_object_handlers php_jq_handlers;
 
@@ -577,6 +579,15 @@ php_jq_new(zend_class_entry *ce)
     return php_jq_new_ex(ce, NULL);
 }
 
+static zend_class_entry *zend_jq_exception_ce;
+
+#define PHP_JQ_REGISTER_EXCEPTION_CLASS(name, class_name) \
+    { \
+        zend_class_entry ce; \
+        INIT_NS_CLASS_ENTRY(ce, PHP_JQ_NS, #class_name, NULL); \
+        zend_jq_##name##_ce = zend_register_internal_class_ex(&ce, zend_ce_error); \
+    }
+
 static void
 jq_init_globals(zend_jq_globals *jq_globals)
 {
@@ -604,6 +615,8 @@ ZEND_MINIT_FUNCTION(jq)
     php_jq_handlers.dtor_obj = zend_objects_destroy_object;
     php_jq_handlers.free_obj = php_jq_free_storage;
     php_jq_handlers.clone_obj = NULL;
+
+    PHP_JQ_REGISTER_EXCEPTION_CLASS(exception, Exception);
 
     /* class constant */
     PHP_JQ_CONST_LONG(RAW, JQ_OPT_RAW);
