@@ -32,9 +32,9 @@ typedef struct {
     ZEND_MALIAS(Jq, alias, name, arg_info, flags)
 #define PHP_JQ_CONST_LONG(name, value) \
     zend_declare_class_constant_long( \
-        php_jq_ce, ZEND_STRS(#name)-1, value TSRMLS_CC)
+        php_jq_ce, ZEND_STRS(#name)-1, value)
 #define PHP_JQ_EXCEPTION(_code, ...) \
-    zend_throw_exception_ex(NULL, _code TSRMLS_CC, __VA_ARGS__)
+    zend_throw_exception_ex(NULL, _code, __VA_ARGS__)
 
 
 ZEND_INI_BEGIN()
@@ -81,7 +81,6 @@ enum {
 static void
 php_jq_err_cb(void *data, jv err)
 {
-    TSRMLS_FETCH();
     if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
         jv dump = jv_dump_string(jv_copy(err), 0);
         if (jv_is_valid(dump)) {
@@ -129,7 +128,7 @@ PHP_JQ_METHOD(load)
     size_t str_len;
     php_jq_t *intern;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s",
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s",
                               &str, &str_len) == FAILURE) {
         RETURN_FALSE;
     }
@@ -169,7 +168,7 @@ PHP_JQ_METHOD(loadFile)
     php_stream *stream;
     php_jq_t *intern;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s",
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s",
                               &filename, &filename_len) == FAILURE) {
         RETURN_FALSE;
     }
@@ -218,9 +217,9 @@ PHP_JQ_METHOD(loadFile)
     php_stream_close(stream);
 }
 
-static void php_jv_dump(zval **return_value, jv x TSRMLS_DC);
+static void php_jv_dump(zval **return_value, jv x);
 static void
-php_jv_dump(zval **return_value, jv x TSRMLS_DC)
+php_jv_dump(zval **return_value, jv x)
 {
     switch (jv_get_kind(x)) {
         default:
@@ -269,7 +268,7 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
                 jv value = jv_array_get(jv_copy(x), i);
                 if (jv_is_valid(value)) {
                     zval zv, *p = &zv;
-                    php_jv_dump(&p, value TSRMLS_CC);
+                    php_jv_dump(&p, value);
                     zend_hash_next_index_insert_new(Z_ARRVAL_P(*return_value),
                                                     &zv);
                 } else {
@@ -302,7 +301,7 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
                 key = jv_object_iter_key(x, i);
                 value = jv_object_iter_value(x, i);
 
-                php_jv_dump(&p, value TSRMLS_CC);
+                php_jv_dump(&p, value);
 
                 jv_key = zend_string_init(jv_string_value(key),
                                           jv_string_length_bytes(jv_copy(key)),
@@ -320,7 +319,7 @@ php_jv_dump(zval **return_value, jv x TSRMLS_DC)
 }
 
 static void
-php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags TSRMLS_DC)
+php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
 {
     jv result;
 
@@ -341,7 +340,7 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags TSRMLS_DC)
                     jv_free(dump);
                 }
             } else {
-                php_jv_dump(&p, result TSRMLS_CC);
+                php_jv_dump(&p, result);
             }
 
             if (!jv_is_valid(result = jq_next(jq))) {
@@ -378,7 +377,7 @@ PHP_JQ_METHOD(filter)
     jv result;
     php_jq_t *intern;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l",
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|l",
                               &str, &str_len, &flags) == FAILURE) {
         RETURN_FALSE;
     }
@@ -405,13 +404,13 @@ PHP_JQ_METHOD(filter)
         RETURN_FALSE;
     }
 
-    php_jq_filter(&return_value, intern->jq, intern->json, flags TSRMLS_CC);
+    php_jq_filter(&return_value, intern->jq, intern->json, flags);
 }
 
 static void
 php_jq_exec(zval **return_value,
             char *str, int str_len, char *filter, int filter_len,
-            long flags TSRMLS_DC)
+            long flags)
 {
     jq_state *jq = php_jq_init();
     jv json, result;
@@ -446,7 +445,7 @@ php_jq_exec(zval **return_value,
         return;
     }
 
-    php_jq_filter(return_value, jq, json, flags TSRMLS_CC);
+    php_jq_filter(return_value, jq, json, flags);
 
     jv_free(json);
     jq_teardown(&jq);
@@ -458,7 +457,7 @@ PHP_JQ_METHOD(parse)
     size_t str_len, filter_len;
     zend_long flags = 0;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|l",
                               &str, &str_len, &filter, &filter_len,
                               &flags) == FAILURE) {
         RETURN_FALSE;
@@ -469,7 +468,7 @@ PHP_JQ_METHOD(parse)
     }
 
     php_jq_exec(&return_value, str, str_len,
-                filter, filter_len, flags TSRMLS_CC);
+                filter, filter_len, flags);
 }
 
 PHP_JQ_METHOD(parseFile)
@@ -482,7 +481,7 @@ PHP_JQ_METHOD(parseFile)
     long maxlen = PHP_STREAM_COPY_ALL;
     php_stream *stream;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss|l",
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|l",
                               &filename, &filename_len, &filter, &filter_len,
                               &flags) == FAILURE) {
         RETURN_FALSE;
@@ -503,7 +502,7 @@ PHP_JQ_METHOD(parseFile)
     if (contents) {
         if (ZSTR_LEN(contents) > 0) {
             php_jq_exec(&return_value, ZSTR_VAL(contents), ZSTR_LEN(contents),
-                        filter, filter_len, flags TSRMLS_CC);
+                        filter, filter_len, flags);
         } else {
             RETVAL_FALSE;
         }
@@ -551,7 +550,7 @@ php_jq_free_storage(zend_object *std)
 }
 
 static zend_object *
-php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr TSRMLS_DC)
+php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr)
 {
     php_jq_t *intern;
 
@@ -573,9 +572,9 @@ php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr TSRMLS_DC)
 }
 
 static zend_object *
-php_jq_new(zend_class_entry *ce TSRMLS_DC)
+php_jq_new(zend_class_entry *ce)
 {
-    return php_jq_new_ex(ce, NULL TSRMLS_CC);
+    return php_jq_new_ex(ce, NULL);
 }
 
 static void
@@ -593,7 +592,7 @@ ZEND_MINIT_FUNCTION(jq)
 
     ce.create_object = php_jq_new;
 
-    php_jq_ce = zend_register_internal_class(&ce TSRMLS_CC);
+    php_jq_ce = zend_register_internal_class(&ce);
     if (php_jq_ce == NULL) {
         return FAILURE;
     }
@@ -618,6 +617,10 @@ ZEND_MINIT_FUNCTION(jq)
 
 ZEND_MSHUTDOWN_FUNCTION(jq)
 {
+#if defined(ZTS) && defined(COMPILE_DL_JQ)
+    ZEND_TSRMLS_CACHE_UPDATE();
+#endif
+
     UNREGISTER_INI_ENTRIES();
     return SUCCESS;
 }

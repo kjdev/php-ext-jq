@@ -28,20 +28,7 @@ ZEND_END_MODULE_GLOBALS(jq)
 #    define PHP_JQ_G(v) (jq_globals.v)
 #endif
 
-#if ZEND_MODULE_API_NO >= 20190128
-#ifndef TSRMLS_CC
-#define TSRMLS_CC
-#endif
-#ifndef TSRMLS_DC
-#define TSRMLS_DC
-#endif
-#ifndef TSRMLS_FETCH
-#define TSRMLS_FETCH()
-#endif
 #define PHP_JQ_ERR(e, ...) php_error_docref(NULL, e, __VA_ARGS__)
-#else
-#define PHP_JQ_ERR(e, ...) php_error_docref(NULL TSRMLS_CC, e, __VA_ARGS__)
-#endif
 
 #ifndef ZED_FE_END
 #define ZEND_FE_END { NULL, NULL, NULL, 0, 0 }
