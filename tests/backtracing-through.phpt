@@ -3,7 +3,7 @@ backtracking through function
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $data = array(
     array('[[20,10][1,0] as $x | def f: (100,200) as $y | def g: [$x + $y, .]; . + $x | g; f[0] | [f][0][1] | f]', '999999999'),
@@ -11,7 +11,7 @@ $data = array(
 
 foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
-    $jq->load($value[1]);
+    $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
     var_dump($jq->filter($value[0], Jq::RAW));
 }

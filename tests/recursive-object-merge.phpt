@@ -3,7 +3,7 @@ recursive object merge
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $data = array(
     array('{"k": {"a": 1, "b": 2}} * .', '{"k": {"a": 0,"c": 3}}'),
@@ -21,7 +21,7 @@ $data = array(
 
 foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
-    $jq->load($value[1]);
+    $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
     var_dump($jq->filter($value[0], Jq::RAW));
 }

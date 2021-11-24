@@ -3,7 +3,7 @@ closures and lexical scoping
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $data = array(
     array('def id(x):x; 2000 as $x | def f(x):1 as $x | id([$x, x, x]); def g(x): 100 as $x | f($x,$x+x); g($x)', '"more testing"')
@@ -11,7 +11,7 @@ $data = array(
 
 foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
-    $jq->load($value[1]);
+    $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
     var_dump($jq->filter($value[0], Jq::RAW));
 }

@@ -3,12 +3,12 @@ load File
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $filename = __DIR__ . '/test.json';
 $filter = '.[] | .name';
 
-$jq->loadFile($filename);
+$jq = Input::fromFile($filename);
 
 echo "== ", $filter, PHP_EOL;
 var_dump($jq->filter($filter));

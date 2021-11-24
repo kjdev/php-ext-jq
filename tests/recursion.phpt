@@ -3,7 +3,7 @@ recursion
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $data = array(
     array('def fac: if . == 1 then 1 else . * (. - 1 | fac) end; [.[] | fac]', '[1,2,3,4]'),
@@ -12,7 +12,7 @@ $data = array(
 
 foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
-    $jq->load($value[1]);
+    $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
     var_dump($jq->filter($value[0], Jq::RAW));
 }

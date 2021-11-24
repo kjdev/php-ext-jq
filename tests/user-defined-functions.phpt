@@ -3,7 +3,7 @@ user-defined functions
 --SKIPIF--
 --FILE--
 <?php
-$jq = new Jq;
+use Jq\Input;
 
 $data = array(
     array('def f: . + 1; def g: def g: . + 100; f | g | f; (f | g), g', '3.0'),
@@ -20,7 +20,7 @@ $data = array(
 
 foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
-    $jq->load($value[1]);
+    $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
     var_dump($jq->filter($value[0], Jq::RAW));
 }
