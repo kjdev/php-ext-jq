@@ -196,51 +196,6 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
     }
 }
 
-static void
-php_jq_exec(zval **return_value,
-            char *str, int str_len, char *filter, int filter_len,
-            long flags)
-{
-    jq_state *jq = php_jq_init();
-    jv json, result;
-
-    if (!jq) {
-        zend_throw_error(zend_jq_exception_ce,
-                         "jq object has not been correctly initialized "
-                         "by its constructor");
-        ZVAL_BOOL(*return_value, 0);
-        return;
-    }
-
-    json = jv_parse_sized(str, str_len);
-    if (!jv_is_valid(json)) {
-        jv_free(json);
-        jq_teardown(&jq);
-        if (PHP_JQ_G(display_errors)) {
-            PHP_JQ_ERR(E_WARNING, "load json parse error");
-        }
-        ZVAL_BOOL(*return_value, 0);
-        return;
-    }
-
-    filter[filter_len] = 0;
-
-    if (!jq_compile(jq, filter)) {
-        jv_free(json);
-        jq_teardown(&jq);
-        if (PHP_JQ_G(display_errors)) {
-            PHP_JQ_ERR(E_WARNING, "filter compile error");
-        }
-        ZVAL_BOOL(*return_value, 0);
-        return;
-    }
-
-    php_jq_filter(return_value, jq, json, flags);
-
-    jv_free(json);
-    jq_teardown(&jq);
-}
-
 static zend_class_entry *zend_jq_ce;
 static zend_object_handlers zend_jq_handlers;
 typedef struct {
