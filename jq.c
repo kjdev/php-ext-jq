@@ -32,6 +32,8 @@ static void *zend_object_alloc(size_t obj_size, zend_class_entry *class_type)
 
 #define PHP_JQ_NS "Jq"
 
+static zend_class_entry *zend_jq_exception_ce;
+
 zend_class_entry *php_jq_ce;
 static zend_object_handlers php_jq_handlers;
 
@@ -46,8 +48,6 @@ typedef struct {
 #define PHP_JQ_CONST_LONG(name, value) \
     zend_declare_class_constant_long( \
         php_jq_ce, ZEND_STRS(#name)-1, value)
-#define PHP_JQ_EXCEPTION(_code, ...) \
-    zend_throw_exception_ex(NULL, _code, __VA_ARGS__)
 
 
 ZEND_INI_BEGIN()
@@ -251,7 +251,8 @@ php_jq_exec(zval **return_value,
     jv json, result;
 
     if (!jq) {
-        PHP_JQ_EXCEPTION(0, "jq object has not been correctly initialized "
+        zend_throw_error(zend_jq_exception_ce,
+                         "jq object has not been correctly initialized "
                          "by its constructor");
         ZVAL_BOOL(*return_value, 0);
         return;
@@ -322,8 +323,6 @@ php_jq_new(zend_class_entry *ce)
 {
     return php_jq_new_ex(ce, NULL);
 }
-
-static zend_class_entry *zend_jq_exception_ce;
 
 static zend_class_entry *zend_jq_input_ce;
 static zend_object_handlers zend_jq_input_handlers;
