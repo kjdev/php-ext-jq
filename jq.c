@@ -30,21 +30,96 @@ static void *zend_object_alloc(size_t obj_size, zend_class_entry *class_type)
 }
 #endif
 
-#define PHP_JQ_NS "Jq"
-
-static zend_class_entry *zend_jq_exception_ce;
-
 ZEND_INI_BEGIN()
     STD_ZEND_INI_ENTRY("jq.display_errors", "1",
                        ZEND_INI_ALL, OnUpdateBool, display_errors,
                        zend_jq_globals, jq_globals)
 ZEND_INI_END()
 
+#define PHP_JQ_NS "Jq"
+
 enum {
     JQ_OPT_RAW = 1
 };
 
-static jq_state *php_jq_init(void);
+static zend_class_entry *zend_jq_exception_ce;
+
+static zend_class_entry *zend_jq_ce;
+static zend_object_handlers zend_jq_handlers;
+typedef struct {
+    zend_object std;
+} zend_jq;
+
+static zend_class_entry *zend_jq_input_ce;
+static zend_object_handlers zend_jq_input_handlers;
+typedef struct {
+    zend_object std;
+} zend_jq_input;
+
+static zend_class_entry *zend_jq_executor_ce;
+static zend_object_handlers zend_jq_executor_handlers;
+typedef struct {
+    jq_state *state;
+    jv json;
+    int loaded;
+    zend_object std;
+} zend_jq_executor;
+
+static zend_class_entry *zend_jq_run_ce;
+static zend_object_handlers zend_jq_run_handlers;
+typedef struct {
+    zend_object std;
+} zend_jq_run;
+
+static void php_jq_err_cb(void *data, jv err)
+{
+    if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
+        jv dump = jv_dump_string(jv_copy(err), 0);
+        if (jv_is_valid(dump)) {
+            PHP_JQ_ERR(E_WARNING, "%s", jv_string_value(dump));
+        }
+        jv_free(dump);
+    }
+}
+
+static jq_state *php_jq_init(void)
+{
+    jq_state *jq = jq_init();
+
+    if (jq) {
+        jq_set_error_cb(jq, php_jq_err_cb, NULL);
+    }
+
+    return jq;
+}
+
+static int php_jq_load_file(jv *var, const char *file)
+{
+    long maxlen = PHP_STREAM_COPY_ALL;
+    php_stream *stream;
+    zend_string *contents;
+
+    stream = php_stream_open_wrapper_ex(file, "rb", REPORT_ERRORS, NULL, NULL);
+    if (!stream) {
+        return FAILURE;
+    }
+
+    contents = php_stream_copy_to_mem(stream, maxlen, 0);
+    if (!contents) {
+        php_stream_close(stream);
+        return FAILURE;
+    }
+    if (ZSTR_LEN(contents) == 0) {
+        *var = jv_string_empty(0);
+    } else {
+        *var = jv_parse_sized(ZSTR_VAL(contents), ZSTR_LEN(contents));
+    }
+
+    zend_string_release(contents);
+    php_stream_close(stream);
+
+    return SUCCESS;
+}
 
 static void php_jv_dump(zval **return_value, jv x)
 {
@@ -145,8 +220,7 @@ static void php_jv_dump(zval **return_value, jv x)
     jv_free(x);
 }
 
-static void
-php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
+static void php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
 {
     jv result;
 
@@ -194,83 +268,6 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
         }
         ZVAL_BOOL(*return_value, 0);
     }
-}
-
-static zend_class_entry *zend_jq_ce;
-static zend_object_handlers zend_jq_handlers;
-typedef struct {
-    zend_object std;
-} zend_jq;
-
-static zend_class_entry *zend_jq_input_ce;
-static zend_object_handlers zend_jq_input_handlers;
-typedef struct {
-    zend_object std;
-} zend_jq_input;
-
-static zend_class_entry *zend_jq_executor_ce;
-static zend_object_handlers zend_jq_executor_handlers;
-typedef struct {
-    jq_state *state;
-    jv json;
-    int loaded;
-    zend_object std;
-} zend_jq_executor;
-
-static zend_class_entry *zend_jq_run_ce;
-static zend_object_handlers zend_jq_run_handlers;
-typedef struct {
-    zend_object std;
-} zend_jq_run;
-
-static void php_jq_err_cb(void *data, jv err)
-{
-    if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
-        jv dump = jv_dump_string(jv_copy(err), 0);
-        if (jv_is_valid(dump)) {
-            PHP_JQ_ERR(E_WARNING, "%s", jv_string_value(dump));
-        }
-        jv_free(dump);
-    }
-}
-
-static jq_state *php_jq_init(void)
-{
-    jq_state *jq = jq_init();
-
-    if (jq) {
-        jq_set_error_cb(jq, php_jq_err_cb, NULL);
-    }
-
-    return jq;
-}
-
-static int php_jq_load_file(jv *var, const char *file)
-{
-    long maxlen = PHP_STREAM_COPY_ALL;
-    php_stream *stream;
-    zend_string *contents;
-
-    stream = php_stream_open_wrapper_ex(file, "rb", REPORT_ERRORS, NULL, NULL);
-    if (!stream) {
-        return FAILURE;
-    }
-
-    contents = php_stream_copy_to_mem(stream, maxlen, 0);
-    if (!contents) {
-        php_stream_close(stream);
-        return FAILURE;
-    }
-    if (ZSTR_LEN(contents) == 0) {
-        *var = jv_string_empty(0);
-    } else {
-        *var = jv_parse_sized(ZSTR_VAL(contents), ZSTR_LEN(contents));
-    }
-
-    zend_string_release(contents);
-    php_stream_close(stream);
-
-    return SUCCESS;
 }
 
 #ifndef ZEND_NS_MN
