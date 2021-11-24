@@ -701,13 +701,13 @@ static const zend_function_entry zend_jq_run_methods[] = {
     ZEND_FE_END
 };
 
-#define PHP_JQ_REGISTER_EXCEPTION_CLASS(name, class_name) \
+#define PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(name, class_name) \
     { \
         zend_class_entry ce; \
         INIT_NS_CLASS_ENTRY(ce, PHP_JQ_NS, #class_name, NULL); \
         zend_jq_##name##_ce = zend_register_internal_class_ex(&ce, zend_ce_error); \
     }
-#define PHP_JQ_REGISTER_CLASS(name, class_name, flags) \
+#define PHP_JQ_NS_REGISTER_CLASS(name, class_name, flags) \
     { \
         zend_class_entry ce; \
         INIT_NS_CLASS_ENTRY(ce, PHP_JQ_NS, #class_name, zend_jq_##name##_methods); \
@@ -750,10 +750,10 @@ ZEND_MINIT_FUNCTION(jq)
     php_jq_handlers.free_obj = php_jq_free_storage;
     php_jq_handlers.clone_obj = NULL;
 
-    PHP_JQ_REGISTER_EXCEPTION_CLASS(exception, Exception);
-    PHP_JQ_REGISTER_CLASS(input, Input, ZEND_ACC_FINAL);
-    PHP_JQ_REGISTER_CLASS(executor, Executor, ZEND_ACC_FINAL);
-    PHP_JQ_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
+    PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(exception, Exception);
+    PHP_JQ_NS_REGISTER_CLASS(input, Input, ZEND_ACC_FINAL);
+    PHP_JQ_NS_REGISTER_CLASS(executor, Executor, ZEND_ACC_FINAL);
+    PHP_JQ_NS_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
 
     /* class constant */
     PHP_JQ_CONST_LONG(RAW, JQ_OPT_RAW);
