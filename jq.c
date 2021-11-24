@@ -34,41 +34,17 @@ static void *zend_object_alloc(size_t obj_size, zend_class_entry *class_type)
 
 static zend_class_entry *zend_jq_exception_ce;
 
-zend_class_entry *php_jq_ce;
-static zend_object_handlers php_jq_handlers;
-
-typedef struct {
-    zend_object std;
-} php_jq_t;
-
-#define PHP_JQ_METHOD(name) \
-    ZEND_METHOD(Jq, name)
-#define PHP_JQ_ME(name, arg_info, flags) \
-    ZEND_ME(Jq, name, arg_info, flags)
-#define PHP_JQ_CONST_LONG(name, value) \
-    zend_declare_class_constant_long( \
-        php_jq_ce, ZEND_STRS(#name)-1, value)
-
-
 ZEND_INI_BEGIN()
     STD_ZEND_INI_ENTRY("jq.display_errors", "1",
                        ZEND_INI_ALL, OnUpdateBool, display_errors,
                        zend_jq_globals, jq_globals)
 ZEND_INI_END()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq___construct, 0, 0, 0)
-ZEND_END_ARG_INFO()
-
 enum {
     JQ_OPT_RAW = 1
 };
 
 static jq_state *php_jq_init(void);
-
-PHP_JQ_METHOD(__construct)
-{
-    ZEND_PARSE_PARAMETERS_NONE();
-}
 
 static void php_jv_dump(zval **return_value, jv x)
 {
@@ -265,42 +241,11 @@ php_jq_exec(zval **return_value,
     jq_teardown(&jq);
 }
 
-static zend_function_entry php_jq_methods[] = {
-    PHP_JQ_ME(__construct, arginfo_jq___construct,
-              ZEND_ACC_PRIVATE | ZEND_ACC_CTOR)
-    ZEND_FE_END
-};
-
-static void
-php_jq_free_storage(zend_object *std)
-{
-    zend_object_std_dtor(std);
-}
-
-static zend_object *
-php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr)
-{
-    php_jq_t *intern;
-
-    intern = ecalloc(1, sizeof(php_jq_t)+zend_object_properties_size(ce));
-    if (ptr) {
-        *ptr = intern;
-    }
-
-    zend_object_std_init(&intern->std, ce);
-    object_properties_init(&intern->std, ce);
-    rebuild_object_properties(&intern->std);
-
-    intern->std.handlers = &php_jq_handlers;
-
-    return &intern->std;
-}
-
-static zend_object *
-php_jq_new(zend_class_entry *ce)
-{
-    return php_jq_new_ex(ce, NULL);
-}
+static zend_class_entry *zend_jq_ce;
+static zend_object_handlers zend_jq_handlers;
+typedef struct {
+    zend_object std;
+} zend_jq;
 
 static zend_class_entry *zend_jq_input_ce;
 static zend_object_handlers zend_jq_input_handlers;
@@ -385,6 +330,38 @@ static int php_jq_load_file(jv *var, const char *file)
 
 #define PHP_JQ_HANDLER(type, obj) (type *)((char *)obj - XtOffsetOf(type, std))
 #define PHP_JQ_HANDLER_ZVAL(type, zval) PHP_JQ_HANDLER(type, Z_OBJ_P(zval))
+
+/* Jq */
+ZEND_BEGIN_ARG_INFO(arginfo_jq_construct, 0)
+ZEND_END_ARG_INFO()
+ZEND_METHOD(Jq, __construct)
+{
+    ZEND_PARSE_PARAMETERS_NONE();
+}
+
+static zend_object *zend_jq_new(zend_class_entry *class_type)
+{
+    zend_jq *intern;
+
+    intern = zend_object_alloc(sizeof(zend_jq), class_type);
+
+    zend_object_std_init(&intern->std, class_type);
+    object_properties_init(&intern->std, class_type);
+
+    intern->std.handlers = &zend_jq_input_handlers;
+
+    return &intern->std;
+}
+
+static void zend_jq_free_storage(zend_object *object)
+{
+    zend_object_std_dtor(object);
+}
+
+static const zend_function_entry zend_jq_methods[] = {
+    ZEND_ME(Jq, __construct, arginfo_jq_construct, ZEND_ACC_PRIVATE)
+    ZEND_FE_END
+};
 
 /* Input */
 ZEND_BEGIN_ARG_INFO(arginfo_jq_input_construct, 0)
@@ -701,6 +678,23 @@ static const zend_function_entry zend_jq_run_methods[] = {
     ZEND_FE_END
 };
 
+#define PHP_JQ_REGISTER_CLASS(flags) \
+    { \
+        zend_class_entry ce; \
+        INIT_CLASS_ENTRY(ce, "Jq", zend_jq_methods); \
+        zend_jq_ce = zend_register_internal_class_ex(&ce, NULL); \
+        zend_jq_ce->ce_flags |= flags; \
+        zend_jq_ce->create_object = zend_jq_new; \
+        zend_jq_ce->serialize = zend_class_serialize_deny; \
+        zend_jq_ce->unserialize = zend_class_unserialize_deny; \
+        memcpy(&zend_jq_handlers, &std_object_handlers, sizeof(zend_object_handlers)); \
+        zend_jq_handlers.offset = XtOffsetOf(zend_jq, std); \
+        zend_jq_handlers.free_obj = zend_jq_free_storage; \
+        zend_jq_handlers.clone_obj = NULL; \
+    }
+#define PHP_JQ_CLASS_CONST_LONG(name, value) \
+    zend_declare_class_constant_long(zend_jq_ce, ZEND_STRS(#name)-1, value)
+
 #define PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(name, class_name) \
     { \
         zend_class_entry ce; \
@@ -730,33 +724,15 @@ jq_init_globals(zend_jq_globals *jq_globals)
 
 ZEND_MINIT_FUNCTION(jq)
 {
-    zend_class_entry ce;
-
     /* class register */
-    INIT_CLASS_ENTRY(ce, "Jq", php_jq_methods);
-
-    ce.create_object = php_jq_new;
-
-    php_jq_ce = zend_register_internal_class(&ce);
-    if (php_jq_ce == NULL) {
-        return FAILURE;
-    }
-
-    memcpy(&php_jq_handlers, zend_get_std_object_handlers(),
-           sizeof(zend_object_handlers));
-
-    php_jq_handlers.offset = XtOffsetOf(php_jq_t, std);
-    php_jq_handlers.dtor_obj = zend_objects_destroy_object;
-    php_jq_handlers.free_obj = php_jq_free_storage;
-    php_jq_handlers.clone_obj = NULL;
-
+    PHP_JQ_REGISTER_CLASS(ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(exception, Exception);
     PHP_JQ_NS_REGISTER_CLASS(input, Input, ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_CLASS(executor, Executor, ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
 
     /* class constant */
-    PHP_JQ_CONST_LONG(RAW, JQ_OPT_RAW);
+    PHP_JQ_CLASS_CONST_LONG(RAW, JQ_OPT_RAW);
 
     /* ini */
     ZEND_INIT_MODULE_GLOBALS(jq, jq_init_globals, NULL);
