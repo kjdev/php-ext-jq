@@ -27,9 +27,8 @@ extension=jq.so
 
 ## Usage
 
-```php
-$jq = new Jq;
-$jq->load('{"name": "jq", "version": "0.1.0"}');
+``` php
+$jq = Jq\Input::fromString('{"name": "jq", "version": "0.1.0"}');
 print_r($jq->filter('.'));
 echo 'NAME: ', $jq->filter('.name'), PHP_EOL;
 echo 'VERSION: ', $jq->filter('.version'), PHP_EOL;
@@ -49,88 +48,70 @@ VERSION: 0.1.0
 
 ## Class synopsis
 
-```
-Jq {
-  public __construct(void)
-  public bool load(string $str)
-  public bool loadString(string $str)
-  public bool loadFile(string $filename)
-  public mixed filter(string $filter, int $flags = 0)
-  static public mixed parse(string $str, string $filter, int $flags = 0)
-  static public mixed parseString(string $str, string $filter, int $flags = 0)
-  static public mixed parseFile(string $filename, string $filter, int $flags = 0)
+### Jq\Input
+
+``` php
+Jq\Input {
+  public static Jq\Executor fromString(string $text)
+  public static Jq\Executor fromFile(string $file)
 }
 ```
 
-### Jq::\_\_construct
-
-```php
-public __construct(void)
-```
-
-Create a Jq instance.
-
-**Return Values:**
-
-Returns a new Jq object
-
 ---
 
-### Jq::load
+### Jq\Input::fromString
 
-```php
-public bool load(string $str)
+``` php
+public static Jq\Executor fromString(string $text)
 ```
 
 Load a JSON string.
 
 **Parameters:**
 
-* str
+* text
 
   JSON text string.
 
 **Return Values:**
 
-Returns TRUE on success or FALSE on failure.
+Returns Jq\Executor instance.
 
 ---
 
-### Jq::loadString
+### Jq\Input::fromFile
 
-```php
-public bool load(string $str)
+``` php
+public static Jq\Executor fromFile(string $file)
 ```
 
-Load a JSON string.
-
-alias: [Jq::load](#jqload)
-
----
-
-### Jq::loadFile
-
-```php
-public bool loadFile(string $filename)
-```
-
-Load a JSON string from file.
+Load a JSON file.
 
 **Parameters:**
 
-* filename
+* file
 
-  JSON text filen name.
+  JSON file name.
 
 **Return Values:**
 
-Returns TRUE on success or FALSE on failure.
+Returns Jq\Executor instance.
 
 ---
 
-### Jq::filter
+### Jq\Executor
 
-```php
+``` php
+Jq\Executor {
+  public mixed filter(string $filter, int $flags)
+}
+```
+
+---
+
+### Jq\Executor::filter
+
+``` php
 public mixed filter(string $filter, int $flags = 0)
 ```
 
@@ -152,17 +133,28 @@ Returns the result value, or FALSE on error.
 
 ---
 
-### Jq::parse
+### Jq\Run
 
-```php
-static public mixed parse(string $str, string $filter, int $flags = 0)
+``` php
+Jq\Run {
+  public static mixed fromString(string $text, string $filter, int $flags = 0)
+  public static mixed fromFile(string $file, string $filter, int $flags = 0)
+}
+```
+
+---
+
+### Jq\Run::fromString
+
+``` php
+public static mixed fromString(string $text, string $filter, int $flags = 0)
 ```
 
 Get filtering result of the JSON string.
 
 **Parameters:**
 
-* str
+* text
 
   JSON text string.
 
@@ -180,31 +172,19 @@ Returns the result value, or FALSE on error.
 
 ---
 
-### Jq::parseString
+### Jq\Run::fromFile
 
-```php
-static public mixed parseString(string $str, string $filter, int $flags = 0)
+``` php
+public static mixed fromFile(string $file, string $filter, int $flags = 0)
 ```
 
-Get filtering result of the JSON string.
-
-alias: [Jq::parse](#jqparse)
-
----
-
-### Jq::parseFile
-
-```php
-static public mixed parseFile(string $filename, string $filter, int $flags = 0)
-```
-
-Get filtering result of the JSON string file.
+Get filtering result of the JSON file.
 
 **Parameters:**
 
-* filename
+* file
 
-  JSON text file name.
+  JSON file name.
 
 * filter
 
@@ -223,8 +203,7 @@ Returns the result value, or FALSE on error.
 * Setting a `Jq::RAW`
 
 ```php
-$jq = new Jq;
-$jq->load('{"name": "jq", "version": "0.1.0"}');
+$jq = Jq\Input::fromString('{"name": "jq", "version": "0.1.0"}');
 print_r($jq->filter('.', JQ::RAW));
 echo PHP_EOL;
 echo 'NAME: ', $jq->filter('.name', JQ::RAW), PHP_EOL;
@@ -243,9 +222,9 @@ VERSION: 0.1.0
 
 ```php
 $text = '{"name": "jq", "version": "0.1.0"}';
-print_r(Jq::parse($text, '.'));
-echo 'NAME: ', Jq::parse($text, '.name'), PHP_EOL;
-echo 'VERSION: ', Jq::parse($text, '.version', JQ::RAW), PHP_EOL;
+print_r(Jq\Run::fromString($text, '.'));
+echo 'NAME: ', Jq\Run::fromString($text, '.name'), PHP_EOL;
+echo 'VERSION: ', Jq\Run::fromString($text, '.version', JQ::RAW), PHP_EOL;
 ```
 
 The above example will output:
