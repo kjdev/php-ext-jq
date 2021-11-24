@@ -36,9 +36,6 @@ zend_class_entry *php_jq_ce;
 static zend_object_handlers php_jq_handlers;
 
 typedef struct {
-    jq_state *jq;
-    jv json;
-    int loaded;
     zend_object std;
 } php_jq_t;
 
@@ -46,8 +43,6 @@ typedef struct {
     ZEND_METHOD(Jq, name)
 #define PHP_JQ_ME(name, arg_info, flags) \
     ZEND_ME(Jq, name, arg_info, flags)
-#define PHP_JQ_MALIAS(alias, name, arg_info, flags) \
-    ZEND_MALIAS(Jq, alias, name, arg_info, flags)
 #define PHP_JQ_CONST_LONG(name, value) \
     zend_declare_class_constant_long( \
         php_jq_ce, ZEND_STRS(#name)-1, value)
@@ -63,34 +58,6 @@ ZEND_INI_END()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_jq___construct, 0, 0, 0)
 ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_load, 0, 0, 1)
-    ZEND_ARG_INFO(0, string)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_loadfile, 0, 0, 1)
-    ZEND_ARG_INFO(0, filename)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_filter, 0, 0, 1)
-    ZEND_ARG_INFO(0, string)
-    ZEND_ARG_INFO(0, flags)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_parse, 0, 0, 2)
-    ZEND_ARG_INFO(0, string)
-    ZEND_ARG_INFO(0, filter)
-    ZEND_ARG_INFO(0, flags)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_parsefile, 0, 0, 2)
-    ZEND_ARG_INFO(0, filename)
-    ZEND_ARG_INFO(0, filter)
-    ZEND_ARG_INFO(0, flags)
-ZEND_END_ARG_INFO()
-
-#define PHP_JQ_OBJ(self, obj) \
-    self = (php_jq_t *)((char *)Z_OBJ_P(obj) - XtOffsetOf(php_jq_t, std))
 
 enum {
     JQ_OPT_RAW = 1
@@ -122,122 +89,10 @@ php_jq_init(void)
 
 PHP_JQ_METHOD(__construct)
 {
-    zval *options = NULL;
-    php_jq_t *intern;
-
-    if (zend_parse_parameters_none() == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    PHP_JQ_OBJ(intern, getThis());
-
-    intern->jq = php_jq_init();
-
-    if (!intern->jq) {
-        PHP_JQ_EXCEPTION(0, "jq object has not been correctly initialized "
-                         "by its constructor");
-        RETURN_FALSE;
-    }
+    ZEND_PARSE_PARAMETERS_NONE();
 }
 
-PHP_JQ_METHOD(load)
-{
-    char *str;
-    size_t str_len;
-    php_jq_t *intern;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s",
-                              &str, &str_len) == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    if (str_len == 0) {
-        RETURN_FALSE;
-    }
-
-    PHP_JQ_OBJ(intern, getThis());
-
-    if (intern->loaded) {
-        jv_free(intern->json);
-    }
-    intern->loaded = 0;
-
-    intern->json = jv_parse_sized(str, str_len);
-    if (!jv_is_valid(intern->json)) {
-        jv_free(intern->json);
-        if (PHP_JQ_G(display_errors)) {
-            PHP_JQ_ERR(E_WARNING, "load json parse error");
-        }
-        RETURN_FALSE;
-    }
-
-    intern->loaded = 1;
-
-    RETURN_TRUE;
-}
-
-PHP_JQ_METHOD(loadFile)
-{
-    char *filename;
-    size_t filename_len;
-    zend_string *contents = NULL;
-    int len;
-    long maxlen = PHP_STREAM_COPY_ALL;
-    php_stream *stream;
-    php_jq_t *intern;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s",
-                              &filename, &filename_len) == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    if (filename_len == 0) {
-        RETURN_FALSE;
-    }
-
-    PHP_JQ_OBJ(intern, getThis());
-
-    if (intern->loaded) {
-        jv_free(intern->json);
-    }
-    intern->loaded = 0;
-
-    /* read file */
-    stream = php_stream_open_wrapper_ex(filename, "rb",
-                                        REPORT_ERRORS, NULL, NULL);
-    if (!stream) {
-        RETURN_FALSE;
-    }
-
-    contents = php_stream_copy_to_mem(stream, maxlen, 0);
-    if (contents) {
-        if (ZSTR_LEN(contents) > 0) {
-            intern->json = jv_parse_sized(ZSTR_VAL(contents),
-                                          ZSTR_LEN(contents));
-            if (jv_is_valid(intern->json)) {
-                intern->loaded = 1;
-                RETVAL_TRUE;
-            } else {
-                if (PHP_JQ_G(display_errors)) {
-                    PHP_JQ_ERR(E_WARNING, "load json parse error");
-                }
-                jv_free(intern->json);
-                RETVAL_FALSE;
-            }
-        } else {
-            RETVAL_FALSE;
-        }
-        zend_string_release(contents);
-    } else {
-        RETVAL_FALSE;
-    }
-
-    php_stream_close(stream);
-}
-
-static void php_jv_dump(zval **return_value, jv x);
-static void
-php_jv_dump(zval **return_value, jv x)
+static void php_jv_dump(zval **return_value, jv x)
 {
     switch (jv_get_kind(x)) {
         default:
@@ -387,44 +242,6 @@ php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
     }
 }
 
-PHP_JQ_METHOD(filter)
-{
-    char *str;
-    size_t str_len;
-    zend_long flags = 0;
-    jv result;
-    php_jq_t *intern;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|l",
-                              &str, &str_len, &flags) == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    if (str_len == 0) {
-        RETURN_FALSE;
-    }
-
-    PHP_JQ_OBJ(intern, getThis());
-
-    if (!intern->loaded) {
-        if (PHP_JQ_G(display_errors)) {
-            PHP_JQ_ERR(E_WARNING, "undefined load json");
-        }
-        RETURN_FALSE;
-    }
-
-    str[str_len] = 0;
-
-    if (!jq_compile(intern->jq, str)) {
-        if (PHP_JQ_G(display_errors)) {
-            PHP_JQ_ERR(E_WARNING, "filter compile error");
-        }
-        RETURN_FALSE;
-    }
-
-    php_jq_filter(&return_value, intern->jq, intern->json, flags);
-}
-
 static void
 php_jq_exec(zval **return_value,
             char *str, int str_len, char *filter, int filter_len,
@@ -469,101 +286,15 @@ php_jq_exec(zval **return_value,
     jq_teardown(&jq);
 }
 
-PHP_JQ_METHOD(parse)
-{
-    char *str, *filter;
-    size_t str_len, filter_len;
-    zend_long flags = 0;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|l",
-                              &str, &str_len, &filter, &filter_len,
-                              &flags) == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    if (str_len == 0 || filter_len == 0) {
-        RETURN_FALSE;
-    }
-
-    php_jq_exec(&return_value, str, str_len,
-                filter, filter_len, flags);
-}
-
-PHP_JQ_METHOD(parseFile)
-{
-    char *filename, *filter;
-    size_t filename_len, filter_len;
-    zend_long flags = 0;
-    zend_string *contents = NULL;
-    int len;
-    long maxlen = PHP_STREAM_COPY_ALL;
-    php_stream *stream;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "ss|l",
-                              &filename, &filename_len, &filter, &filter_len,
-                              &flags) == FAILURE) {
-        RETURN_FALSE;
-    }
-
-    if (filename_len == 0 || filter_len == 0) {
-        RETURN_FALSE;
-    }
-
-    /* read file */
-    stream = php_stream_open_wrapper_ex(filename, "rb",
-                                        REPORT_ERRORS, NULL, NULL);
-    if (!stream) {
-        RETURN_FALSE;
-    }
-
-    contents = php_stream_copy_to_mem(stream, maxlen, 0);
-    if (contents) {
-        if (ZSTR_LEN(contents) > 0) {
-            php_jq_exec(&return_value, ZSTR_VAL(contents), ZSTR_LEN(contents),
-                        filter, filter_len, flags);
-        } else {
-            RETVAL_FALSE;
-        }
-        zend_string_release(contents);
-    } else {
-        RETVAL_FALSE;
-    }
-
-    php_stream_close(stream);
-}
-
 static zend_function_entry php_jq_methods[] = {
     PHP_JQ_ME(__construct, arginfo_jq___construct,
-              ZEND_ACC_PUBLIC | ZEND_ACC_CTOR)
-    PHP_JQ_ME(load, arginfo_jq_load, ZEND_ACC_PUBLIC)
-    PHP_JQ_MALIAS(loadString, load, arginfo_jq_load, ZEND_ACC_PUBLIC)
-    PHP_JQ_ME(loadFile, arginfo_jq_loadfile, ZEND_ACC_PUBLIC)
-    PHP_JQ_ME(filter, arginfo_jq_filter, ZEND_ACC_PUBLIC)
-    PHP_JQ_ME(parse, arginfo_jq_parse, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
-    PHP_JQ_MALIAS(parseString, parse, arginfo_jq_parse,
-                  ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
-    PHP_JQ_ME(parseFile, arginfo_jq_parsefile,
-              ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
+              ZEND_ACC_PRIVATE | ZEND_ACC_CTOR)
     ZEND_FE_END
 };
 
 static void
 php_jq_free_storage(zend_object *std)
 {
-    php_jq_t *intern;
-    intern = (php_jq_t *)((char *)std - XtOffsetOf(php_jq_t, std));
-    if (!intern) {
-        return;
-    }
-
-    if (intern->loaded) {
-        jv_free(intern->json);
-    }
-
-    if (intern->jq) {
-        jq_teardown(&intern->jq);
-    }
-
     zend_object_std_dtor(std);
 }
 
@@ -582,9 +313,6 @@ php_jq_new_ex(zend_class_entry *ce, php_jq_t **ptr)
     rebuild_object_properties(&intern->std);
 
     intern->std.handlers = &php_jq_handlers;
-
-    intern->jq = NULL;
-    intern->loaded = 0;
 
     return &intern->std;
 }
