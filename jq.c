@@ -63,29 +63,7 @@ enum {
     JQ_OPT_RAW = 1
 };
 
-static void
-php_jq_err_cb(void *data, jv err)
-{
-    if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
-        jv dump = jv_dump_string(jv_copy(err), 0);
-        if (jv_is_valid(dump)) {
-            PHP_JQ_ERR(E_WARNING, "%s", jv_string_value(dump));
-        }
-        jv_free(dump);
-    }
-}
-
-static jq_state *
-php_jq_init(void)
-{
-    jq_state *jq = jq_init();
-
-    if (jq) {
-        jq_set_error_cb(jq, php_jq_err_cb, NULL);
-    }
-
-    return jq;
-}
+static jq_state *php_jq_init(void);
 
 PHP_JQ_METHOD(__construct)
 {
@@ -345,6 +323,28 @@ typedef struct {
     zend_object std;
 } zend_jq_run;
 
+static void php_jq_err_cb(void *data, jv err)
+{
+    if (jv_is_valid(err) && PHP_JQ_G(display_errors)) {
+        jv dump = jv_dump_string(jv_copy(err), 0);
+        if (jv_is_valid(dump)) {
+            PHP_JQ_ERR(E_WARNING, "%s", jv_string_value(dump));
+        }
+        jv_free(dump);
+    }
+}
+
+static jq_state *php_jq_init(void)
+{
+    jq_state *jq = jq_init();
+
+    if (jq) {
+        jq_set_error_cb(jq, php_jq_err_cb, NULL);
+    }
+
+    return jq;
+}
+
 static int php_jq_load_file(jv *var, const char *file)
 {
     long maxlen = PHP_STREAM_COPY_ALL;
@@ -410,7 +410,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromString)
     object_init_ex(return_value, zend_jq_executor_ce);
     retval = PHP_JQ_HANDLER_ZVAL(zend_jq_executor, return_value);
 
-    retval->state = jq_init();
+    retval->state = php_jq_init();
 
     retval->json = jv_parse_sized(text, text_len);
     if (!jv_is_valid(retval->json)) {
@@ -438,7 +438,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromFile)
     object_init_ex(return_value, zend_jq_executor_ce);
     retval = PHP_JQ_HANDLER_ZVAL(zend_jq_executor, return_value);
 
-    retval->state = jq_init();
+    retval->state = php_jq_init();
 
     if (php_jq_load_file(&retval->json, file) != SUCCESS) {
         zend_throw_error(zend_jq_exception_ce, "failed to open file.");
@@ -608,7 +608,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromString)
 
     filter[filter_len] = 0;
 
-    state = jq_init();
+    state = php_jq_init();
 
     if (!jq_compile(state, filter)) {
         jv_free(json);
@@ -654,7 +654,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromFile)
         RETURN_FALSE;
     }
 
-    state = jq_init();
+    state = php_jq_init();
 
     filter[filter_len] = 0;
 
