@@ -39,7 +39,7 @@ ZEND_INI_END()
 #define PHP_JQ_NS "Jq"
 
 enum {
-    JQ_OPT_RAW = 1
+    PHP_JQ_OPT_RAW = 1
 };
 
 static zend_class_entry *zend_jq_exception_ce;
@@ -230,7 +230,7 @@ static void php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
         int multiple = 0;
         while (1) {
             zval zv, *p = &zv;
-            if (flags == JQ_OPT_RAW) {
+            if (flags == PHP_JQ_OPT_RAW) {
                 if (jv_get_kind(result) == JV_KIND_STRING) {
                     ZVAL_STRING(&zv, jv_string_value(result));
                 } else {
@@ -668,8 +668,7 @@ static const zend_function_entry zend_jq_run_methods[] = {
         zend_jq_##name##_handlers.clone_obj = NULL; \
     }
 
-static void
-jq_init_globals(zend_jq_globals *jq_globals)
+static void zend_jq_init_globals(zend_jq_globals *jq_globals)
 {
     jq_globals->display_errors = 1;
 }
@@ -684,10 +683,10 @@ ZEND_MINIT_FUNCTION(jq)
     PHP_JQ_NS_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
 
     /* class constant */
-    PHP_JQ_CLASS_CONST_LONG(RAW, JQ_OPT_RAW);
+    PHP_JQ_CLASS_CONST_LONG(RAW, PHP_JQ_OPT_RAW);
 
     /* ini */
-    ZEND_INIT_MODULE_GLOBALS(jq, jq_init_globals, NULL);
+    ZEND_INIT_MODULE_GLOBALS(jq, zend_jq_init_globals, NULL);
     REGISTER_INI_ENTRIES();
 
     return SUCCESS;
