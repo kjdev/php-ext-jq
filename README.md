@@ -126,6 +126,7 @@ Get filtering result of the load string.
 * flags
 
   - `Jq::RAW` is raw output
+  - `Jq::SORT` is object with the keys in sorted order
 
 **Return Values:**
 
@@ -165,6 +166,7 @@ Get filtering result of the JSON string.
 * flags
 
   - `Jq::RAW` is raw output
+  - `Jq::SORT` is object with the keys in sorted order
 
 **Return Values:**
 
@@ -193,6 +195,7 @@ Get filtering result of the JSON file.
 * flags
 
   - `Jq::RAW` is raw output
+  - `Jq::SORT` is object with the keys in sorted order
 
 **Return Values:**
 
@@ -204,10 +207,10 @@ Returns the result value, or FALSE on error.
 
 ```php
 $jq = Jq\Input::fromString('{"name": "jq", "version": "0.1.0"}');
-print_r($jq->filter('.', JQ::RAW));
+print_r($jq->filter('.', Jq::RAW));
 echo PHP_EOL;
-echo 'NAME: ', $jq->filter('.name', JQ::RAW), PHP_EOL;
-echo 'VERSION: ', $jq->filter('.version', JQ::RAW), PHP_EOL;
+echo 'NAME: ', $jq->filter('.name', Jq::RAW), PHP_EOL;
+echo 'VERSION: ', $jq->filter('.version', Jq::RAW), PHP_EOL;
 ```
 
 The above example will output:
@@ -224,7 +227,7 @@ VERSION: 0.1.0
 $text = '{"name": "jq", "version": "0.1.0"}';
 print_r(Jq\Run::fromString($text, '.'));
 echo 'NAME: ', Jq\Run::fromString($text, '.name'), PHP_EOL;
-echo 'VERSION: ', Jq\Run::fromString($text, '.version', JQ::RAW), PHP_EOL;
+echo 'VERSION: ', Jq\Run::fromString($text, '.version', Jq::RAW), PHP_EOL;
 ```
 
 The above example will output:
