@@ -39,7 +39,8 @@ ZEND_INI_END()
 #define PHP_JQ_NS "Jq"
 
 enum {
-    PHP_JQ_OPT_RAW = 1
+    PHP_JQ_OPT_RAW = 1,
+    PHP_JQ_OPT_SORT = 2,
 };
 
 static zend_class_entry *zend_jq_exception_ce;
@@ -121,7 +122,7 @@ static int php_jq_load_file(jv *var, const char *file)
     return SUCCESS;
 }
 
-static void php_jv_dump(zval **return_value, jv x)
+static void php_jv_dump(zval **return_value, jv x, int flags)
 {
     switch (jv_get_kind(x)) {
         default:
@@ -170,7 +171,7 @@ static void php_jv_dump(zval **return_value, jv x)
                 jv value = jv_array_get(jv_copy(x), i);
                 if (jv_is_valid(value)) {
                     zval zv, *p = &zv;
-                    php_jv_dump(&p, value);
+                    php_jv_dump(&p, value, flags);
                     zend_hash_next_index_insert_new(Z_ARRVAL_P(*return_value),
                                                     &zv);
                 } else {
@@ -186,24 +187,40 @@ static void php_jv_dump(zval **return_value, jv x)
                 break;
             }
 
+            jv keyset = jv_null();
             while (1) {
                 jv key, value;
                 zval zv, *p = &zv;
                 zend_string *jv_key;
 
-                if (first) {
-                    i = jv_object_iter(x);
+                if (flags & PHP_JQ_OPT_SORT) {
+                    if (first) {
+                        keyset = jv_keys(jv_copy(x));
+                        i = 0;
+                    } else {
+                        i++;
+                    }
+                    if (i >= jv_array_length(jv_copy(keyset))) {
+                        jv_free(keyset);
+                        break;
+                    }
+                    key = jv_array_get(jv_copy(keyset), i);
+                    value = jv_object_get(jv_copy(x), jv_copy(key));
                 } else {
-                    i = jv_object_iter_next(x, i);
-                }
-                if (!jv_object_iter_valid(x, i)) {
-                    break;
+                    if (first) {
+                        i = jv_object_iter(x);
+                    } else {
+                        i = jv_object_iter_next(x, i);
+                    }
+                    if (!jv_object_iter_valid(x, i)) {
+                        break;
+                    }
+
+                    key = jv_object_iter_key(x, i);
+                    value = jv_object_iter_value(x, i);
                 }
 
-                key = jv_object_iter_key(x, i);
-                value = jv_object_iter_value(x, i);
-
-                php_jv_dump(&p, value);
+                php_jv_dump(&p, value, flags);
 
                 jv_key = zend_string_init(jv_string_value(key),
                                           jv_string_length_bytes(jv_copy(key)),
@@ -230,18 +247,22 @@ static void php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
         int multiple = 0;
         while (1) {
             zval zv, *p = &zv;
-            if (flags == PHP_JQ_OPT_RAW) {
+            if (flags & PHP_JQ_OPT_RAW) {
                 if (jv_get_kind(result) == JV_KIND_STRING) {
                     ZVAL_STRING(&zv, jv_string_value(result));
                 } else {
-                    jv dump = jv_dump_string(result, 0);
+                    int dump_flags = 0;
+                    if (flags & PHP_JQ_OPT_SORT) {
+                        dump_flags = JV_PRINT_SORTED;
+                    }
+                    jv dump = jv_dump_string(result, dump_flags);
                     if (jv_is_valid(dump)) {
                         ZVAL_STRING(&zv, jv_string_value(dump));
                     }
                     jv_free(dump);
                 }
             } else {
-                php_jv_dump(&p, result);
+                php_jv_dump(&p, result, flags);
             }
 
             if (!jv_is_valid(result = jq_next(jq))) {
@@ -684,6 +705,7 @@ ZEND_MINIT_FUNCTION(jq)
 
     /* class constant */
     PHP_JQ_CLASS_CONST_LONG(RAW, PHP_JQ_OPT_RAW);
+    PHP_JQ_CLASS_CONST_LONG(SORT, PHP_JQ_OPT_SORT);
 
     /* ini */
     ZEND_INIT_MODULE_GLOBALS(jq, zend_jq_init_globals, NULL);
