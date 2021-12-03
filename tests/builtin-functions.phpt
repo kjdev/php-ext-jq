@@ -35,7 +35,7 @@ foreach ($data as $value) {
     echo "== ", $value[0], PHP_EOL;
     $jq = Input::fromString($value[1]);
     var_dump($jq->filter($value[0]));
-    var_dump($jq->filter($value[0], Jq::RAW));
+    var_dump($jq->filter($value[0], Jq\RAW));
 }
 
 --EXPECTF--

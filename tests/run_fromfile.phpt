@@ -8,7 +8,7 @@ $filter = '.[] | .name';
 echo "== ", $filter, PHP_EOL;
 
 var_dump(Jq\Run::fromFile($filename, $filter));
-var_dump(Jq\Run::fromFile($filename, $filter, Jq::RAW));
+var_dump(Jq\Run::fromFile($filename, $filter, Jq\RAW));
 try {
   var_dump(Jq\Run::fromFile(__FILE__, ''));
 } catch (Throwable $e) {
