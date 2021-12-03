@@ -99,7 +99,7 @@ $filter = '.[0] | {name: .name, owner: .owner.login}';
 echo "== ", $filter, PHP_EOL;
 
 var_dump(Jq\Run::fromString($text, $filter));
-var_dump(Jq\Run::fromString($text, $filter, Jq::RAW));
+var_dump(Jq\Run::fromString($text, $filter, Jq\RAW));
 try {
   var_dump(Jq\Run::fromString('text', ''));
 } catch (Throwable $e) {

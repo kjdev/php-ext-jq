@@ -13,22 +13,22 @@ $jq = Jq\Input::fromString($text);
 echo "== default\n";
 print_r($jq->filter('.'));
 echo "== sort\n";
-print_r($jq->filter('.', Jq::SORT));
+print_r($jq->filter('.', Jq\SORT));
 
 echo "== raw\n";
-echo $jq->filter('.', Jq::RAW), PHP_EOL;
+echo $jq->filter('.', Jq\RAW), PHP_EOL;
 echo "== raw|sort\n";
-echo $jq->filter('.', Jq::RAW|Jq::SORT), PHP_EOL;
+echo $jq->filter('.', Jq\RAW|Jq\SORT), PHP_EOL;
 
 echo "== run\n";
 print_r(Run::fromString($text, '.'));
 echo "== run sort\n";
-print_r(Run::fromString($text, '.', Jq::SORT));
+print_r(Run::fromString($text, '.', Jq\SORT));
 
 echo "== run raw\n";
-echo Run::fromString($text, '.', Jq::RAW), PHP_EOL;
+echo Run::fromString($text, '.', Jq\RAW), PHP_EOL;
 echo "== run raw|sort\n";
-echo Run::fromString($text, '.', Jq::RAW|Jq::SORT), PHP_EOL;
+echo Run::fromString($text, '.', Jq\RAW|Jq\SORT), PHP_EOL;
 
 --EXPECTF--
 == default

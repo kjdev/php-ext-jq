@@ -12,7 +12,7 @@ $jq = Input::fromFile($filename);
 
 echo "== ", $filter, PHP_EOL;
 var_dump($jq->filter($filter));
-var_dump($jq->filter($filter, Jq::RAW));
+var_dump($jq->filter($filter, Jq\RAW));
 
 --EXPECTF--
 == .[] | .name
