@@ -39,6 +39,7 @@ ZEND_INI_END()
 #define PHP_JQ_NS "Jq"
 
 enum {
+    PHP_JQ_OPT_NONE = 0,
     PHP_JQ_OPT_RAW = 1,
     PHP_JQ_OPT_SORT = 2,
 };
@@ -651,6 +652,7 @@ static void zend_jq_init_globals(zend_jq_globals *jq_globals)
 ZEND_MINIT_FUNCTION(jq)
 {
     /* constant */
+    PHP_JQ_NS_CONST_LONG(NONE, PHP_JQ_OPT_NONE);
     PHP_JQ_NS_CONST_LONG(RAW, PHP_JQ_OPT_RAW);
     PHP_JQ_NS_CONST_LONG(SORT, PHP_JQ_OPT_SORT);
 
