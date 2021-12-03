@@ -31,7 +31,7 @@ static void *zend_object_alloc(size_t obj_size, zend_class_entry *class_type)
 #endif
 
 ZEND_INI_BEGIN()
-    STD_ZEND_INI_ENTRY("jq.display_errors", "1",
+    STD_ZEND_INI_ENTRY("jq.display_errors", "0",
                        ZEND_INI_ALL, OnUpdateBool, display_errors,
                        zend_jq_globals, jq_globals)
 ZEND_INI_END()
@@ -691,7 +691,7 @@ static const zend_function_entry zend_jq_run_methods[] = {
 
 static void zend_jq_init_globals(zend_jq_globals *jq_globals)
 {
-    jq_globals->display_errors = 1;
+    jq_globals->display_errors = 0;
 }
 
 ZEND_MINIT_FUNCTION(jq)
