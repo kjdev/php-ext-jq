@@ -665,8 +665,8 @@ static const zend_function_entry zend_jq_run_methods[] = {
         zend_jq_handlers.free_obj = zend_jq_free_storage; \
         zend_jq_handlers.clone_obj = NULL; \
     }
-#define PHP_JQ_CLASS_CONST_LONG(name, value) \
-    zend_declare_class_constant_long(zend_jq_ce, ZEND_STRS(#name)-1, value)
+#define PHP_JQ_NS_CONST_LONG(name, value) \
+    REGISTER_LONG_CONSTANT(ZEND_NS_NAME(PHP_JQ_NS, #name), value, CONST_CS | CONST_PERSISTENT)
 
 #define PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(name, class_name) \
     { \
@@ -696,16 +696,16 @@ static void zend_jq_init_globals(zend_jq_globals *jq_globals)
 
 ZEND_MINIT_FUNCTION(jq)
 {
+    /* constant */
+    PHP_JQ_NS_CONST_LONG(RAW, PHP_JQ_OPT_RAW);
+    PHP_JQ_NS_CONST_LONG(SORT, PHP_JQ_OPT_SORT);
+
     /* class register */
     PHP_JQ_REGISTER_CLASS(ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_EXCEPTION_CLASS(exception, Exception);
     PHP_JQ_NS_REGISTER_CLASS(input, Input, ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_CLASS(executor, Executor, ZEND_ACC_FINAL);
     PHP_JQ_NS_REGISTER_CLASS(run, Run, ZEND_ACC_FINAL);
-
-    /* class constant */
-    PHP_JQ_CLASS_CONST_LONG(RAW, PHP_JQ_OPT_RAW);
-    PHP_JQ_CLASS_CONST_LONG(SORT, PHP_JQ_OPT_SORT);
 
     /* ini */
     ZEND_INIT_MODULE_GLOBALS(jq, zend_jq_init_globals, NULL);
