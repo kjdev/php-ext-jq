@@ -313,7 +313,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, __construct)
     ZEND_PARSE_PARAMETERS_NONE();
 }
 
-ZEND_BEGIN_ARG_INFO(arginfo_jq_input_fromstring, 1)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_input_fromstring, 0, 0, 1)
     ZEND_ARG_INFO(0, text)
 ZEND_END_ARG_INFO()
 ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromString)
@@ -341,7 +341,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromString)
     retval->loaded = 1;
 }
 
-ZEND_BEGIN_ARG_INFO(arginfo_jq_input_fromfile, 1)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_input_fromfile, 0, 0, 1)
     ZEND_ARG_INFO(0, file)
 ZEND_END_ARG_INFO()
 ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromFile)
@@ -417,7 +417,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Executor, __construct)
     ZEND_PARSE_PARAMETERS_NONE();
 }
 
-ZEND_BEGIN_ARG_INFO(arginfo_jq_executor_filter, 2)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_executor_filter, 0, 0, 1)
     ZEND_ARG_INFO(0, filter)
     ZEND_ARG_INFO(0, flags)
 ZEND_END_ARG_INFO()
@@ -498,7 +498,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, __construct)
     ZEND_PARSE_PARAMETERS_NONE();
 }
 
-ZEND_BEGIN_ARG_INFO(arginfo_jq_run_fromstring, 2)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_run_fromstring, 0, 0, 2)
     ZEND_ARG_INFO(0, text)
     ZEND_ARG_INFO(0, filter)
     ZEND_ARG_INFO(0, flags)
@@ -543,7 +543,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromString)
     jq_teardown(&state);
 }
 
-ZEND_BEGIN_ARG_INFO(arginfo_jq_run_fromfile, 2)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_run_fromfile, 0, 0, 2)
     ZEND_ARG_INFO(0, file)
     ZEND_ARG_INFO(0, filter)
     ZEND_ARG_INFO(0, flags)
