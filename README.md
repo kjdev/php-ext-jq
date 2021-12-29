@@ -52,8 +52,8 @@ VERSION: 0.1.0
 
 ``` php
 Jq\Input {
-  public static Jq\Executor fromString(string $text)
-  public static Jq\Executor fromFile(string $file)
+  public static fromString(string $text): Jq\Executor
+  public static fromFile(string $file): Jq\Executor
 }
 ```
 
@@ -62,7 +62,7 @@ Jq\Input {
 ### Jq\Input::fromString
 
 ``` php
-public static Jq\Executor fromString(string $text)
+public static fromString(string $text): Jq\Executor
 ```
 
 Load a JSON string.
@@ -82,7 +82,7 @@ Returns Jq\Executor instance.
 ### Jq\Input::fromFile
 
 ``` php
-public static Jq\Executor fromFile(string $file)
+public static fromFile(string $file): Jq\Executor
 ```
 
 Load a JSON file.
@@ -103,7 +103,9 @@ Returns Jq\Executor instance.
 
 ``` php
 Jq\Executor {
-  public mixed filter(string $filter, int $flags)
+  public filter(string $filter, int $flags): mixed
+  public variable(string $name, string $value): self
+  public variables(): array
 }
 ```
 
@@ -112,7 +114,7 @@ Jq\Executor {
 ### Jq\Executor::filter
 
 ``` php
-public mixed filter(string $filter, int $flags = 0)
+public filter(string $filter, int $flags = 0): mixed
 ```
 
 Get filtering result of the load string.
@@ -132,14 +134,50 @@ Get filtering result of the load string.
 
 Returns the result value, or FALSE on error.
 
+### Jq\Executor::variable
+
+``` php
+public variable(string $name, string $value): self
+```
+
+Set variable value.
+
+**Parameters:**
+
+* name
+
+  variable name.
+
+* value
+
+  variable value.
+
+  - treat strings starting with `@` as JSON strings
+
+**Return Values:**
+
+Returns the self instance.
+
+### Jq\Executor::variables
+
+``` php
+public variables(): array
+```
+
+Get variables value.
+
+**Return Values:**
+
+Returns the variables.
+
 ---
 
 ### Jq\Run
 
 ``` php
 Jq\Run {
-  public static mixed fromString(string $text, string $filter, int $flags = 0)
-  public static mixed fromFile(string $file, string $filter, int $flags = 0)
+  public static fromString(string $text, string $filter, int $flags = 0, array $variables = []): mixed
+  public static fromFile(string $file, string $filter, int $flags = 0, array $variables = []): mixed
 }
 ```
 
@@ -148,7 +186,7 @@ Jq\Run {
 ### Jq\Run::fromString
 
 ``` php
-public static mixed fromString(string $text, string $filter, int $flags = 0)
+public static fromString(string $text, string $filter, int $flags = 0, array $variables = []): mixed
 ```
 
 Get filtering result of the JSON string.
@@ -168,6 +206,14 @@ Get filtering result of the JSON string.
   - `Jq\RAW` is raw output
   - `Jq\SORT` is object with the keys in sorted order
 
+* variables
+
+  jq variables array.
+
+  - key is variable name
+  - value is string of variable value
+      - treat strings starting with `@` as JSON strings
+
 **Return Values:**
 
 Returns the result value, or FALSE on error.
@@ -177,7 +223,7 @@ Returns the result value, or FALSE on error.
 ### Jq\Run::fromFile
 
 ``` php
-public static mixed fromFile(string $file, string $filter, int $flags = 0)
+public static fromFile(string $file, string $filter, int $flags = 0, array $variables = []): mixed
 ```
 
 Get filtering result of the JSON file.
@@ -196,6 +242,14 @@ Get filtering result of the JSON file.
 
   - `Jq\RAW` is raw output
   - `Jq\SORT` is object with the keys in sorted order
+
+* variables
+
+  jq variables array.
+
+  - key is variable name
+  - value is string of variable value
+      - treat strings starting with `@` as JSON strings
 
 **Return Values:**
 
@@ -240,4 +294,59 @@ Array
 )
 NAME: jq
 VERSION: 0.1.0
+```
+
+- Execute static function with a variables
+
+```php
+$text = <<<EOT
+[
+  {"key": "string", "var": "STRING"},
+  {"key": 123, "var": "NUMBER:123"}
+]
+EOT;
+$jq = Jq\Input::fromString($text);
+print_r(
+  $jq->filter('.')
+  // (OR) Jq\Run::fromString($text, '.')
+);
+print_r(
+  $jq->variable('key', 'string')->filter('.[] | select(.key == $key)')
+  // (OR) Jq\Run::fromString($text, '.[] | select(.key == $key)', 0, ['key' => 'string'])
+);
+print_r(
+  $jq->variable('key', '@123')->filter('.[] | select(.key == $key)')
+  // (OR) Jq\Run::fromString($text, '.[] | select(.key == $key)', 0, ['key' => '@123'])
+);
+// ['key' => '123'], it is evaluated as a character string, so it does not match
+```
+
+The above example will output:
+
+```
+Array
+(
+    [0] => Array
+        (
+            [key] => string
+            [var] => STRING
+        )
+
+    [1] => Array
+        (
+            [key] => 123
+            [var] => NUMBER:123
+        )
+
+)
+Array
+(
+    [key] => string
+    [var] => STRING
+)
+Array
+(
+    [key] => 123
+    [var] => NUMBER:123
+)
 ```
