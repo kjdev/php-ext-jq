@@ -61,9 +61,7 @@ typedef struct {
 static zend_class_entry *zend_jq_executor_ce;
 static zend_object_handlers zend_jq_executor_handlers;
 typedef struct {
-    jq_state *state;
     jv json;
-    int loaded;
     zval variables;
     zend_object std;
 } zend_jq_executor;
@@ -382,16 +380,11 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromString)
     object_init_ex(return_value, zend_jq_executor_ce);
     retval = PHP_JQ_HANDLER_ZVAL(zend_jq_executor, return_value);
 
-    retval->state = php_jq_init();
-
     retval->json = jv_parse_sized(text, text_len);
     if (!jv_is_valid(retval->json)) {
-        jv_free(retval->json);
         zend_throw_error(zend_jq_exception_ce, "failed to load json.");
         RETURN_FALSE;
     }
-
-    retval->loaded = 1;
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_input_fromfile, 0, 0, 1)
@@ -410,20 +403,15 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Input, fromFile)
     object_init_ex(return_value, zend_jq_executor_ce);
     retval = PHP_JQ_HANDLER_ZVAL(zend_jq_executor, return_value);
 
-    retval->state = php_jq_init();
-
     if (php_jq_load_file(&retval->json, file) != SUCCESS) {
         zend_throw_error(zend_jq_exception_ce, "failed to open file.");
         RETURN_FALSE;
     }
 
     if (!jv_is_valid(retval->json)) {
-        jv_free(retval->json);
         zend_throw_error(zend_jq_exception_ce, "failed to load json.");
         RETURN_FALSE;
     }
-
-    retval->loaded = 1;
 }
 
 static zend_object *zend_jq_input_new(zend_class_entry *class_type)
@@ -478,6 +466,7 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Executor, filter)
 {
     char *filter;
     size_t filter_len;
+    jq_state *state;
     jv arguments;
     zend_long flags = 0;
     zend_jq_executor *intern;
@@ -498,15 +487,20 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Executor, filter)
 
     filter[filter_len] = 0;
 
-    if (!jq_compile_args(intern->state, filter, jv_copy(arguments))) {
+    state = php_jq_init();
+
+    if (!jq_compile_args(state, filter, jv_copy(arguments))) {
         jv_free(arguments);
+        jq_teardown(&state);
         zend_throw_error(zend_jq_exception_ce,
                          "failed to compile filter string.");
         RETURN_FALSE;
     }
     jv_free(arguments);
 
-    php_jq_filter(&return_value, intern->state, intern->json, flags);
+    php_jq_filter(&return_value, state, intern->json, flags);
+
+    jq_teardown(&state);
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_executor_variable, 0, 0, 2)
@@ -565,8 +559,7 @@ static zend_object *zend_jq_executor_new(zend_class_entry *class_type)
 
     intern->std.handlers = &zend_jq_executor_handlers;
 
-    intern->state = NULL;
-    intern->loaded = 0;
+    intern->json = jv_invalid();
     array_init(&intern->variables);
 
     return &intern->std;
@@ -578,13 +571,7 @@ static void zend_jq_executor_free_storage(zend_object *object)
 
     intern = PHP_JQ_HANDLER(zend_jq_executor, object);
     if (intern) {
-        if (intern->loaded) {
-            jv_free(intern->json);
-        }
-        if (intern->state) {
-            jq_teardown(&intern->state);
-            intern->state = NULL;
-        }
+        jv_free(intern->json);
         zval_dtor(&intern->variables);
     }
 
