@@ -7,7 +7,6 @@
 #include "ext/standard/info.h"
 #include "ext/standard/php_array.h"
 #include "Zend/zend_exceptions.h"
-#include "Zend/zend_interfaces.h"
 
 #include "php_jq.h"
 
@@ -760,8 +759,6 @@ static const zend_function_entry zend_jq_run_methods[] = {
         zend_jq_##name##_ce = zend_register_internal_class_ex(&ce, NULL); \
         zend_jq_##name##_ce->ce_flags |= flags; \
         zend_jq_##name##_ce->create_object = zend_jq_##name##_new; \
-        zend_jq_##name##_ce->serialize = zend_class_serialize_deny; \
-        zend_jq_##name##_ce->unserialize = zend_class_unserialize_deny; \
         memcpy(&zend_jq_##name##_handlers, &std_object_handlers, sizeof(zend_object_handlers)); \
         zend_jq_##name##_handlers.offset = XtOffsetOf(zend_jq_##name, std); \
         zend_jq_##name##_handlers.free_obj = zend_jq_##name##_free_storage; \
