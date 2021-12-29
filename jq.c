@@ -343,6 +343,25 @@ static void php_jq_filter(zval **return_value, jq_state *jq, jv json, int flags)
     }
 }
 
+static int php_jq_execute(zval **return_value,
+                          char *filter, jv json, jv arguments, int flags)
+{
+    jq_state *state;
+
+    state = php_jq_init();
+
+    if (!jq_compile_args(state, filter, jv_copy(arguments))) {
+        jq_teardown(&state);
+        return FAILURE;
+    }
+
+    php_jq_filter(return_value, state, json, flags);
+
+    jq_teardown(&state);
+
+    return SUCCESS;
+}
+
 #ifndef ZEND_NS_MN
 #define ZEND_NS_MN(ns, name) zim_##ns_##name
 #endif
@@ -466,10 +485,10 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Executor, filter)
 {
     char *filter;
     size_t filter_len;
-    jq_state *state;
     jv arguments;
     zend_long flags = 0;
     zend_jq_executor *intern;
+    int result;
 
     ZEND_PARSE_PARAMETERS_START(1, 2)
         Z_PARAM_STRING(filter, filter_len)
@@ -487,20 +506,15 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Executor, filter)
 
     filter[filter_len] = 0;
 
-    state = php_jq_init();
+    result = php_jq_execute(&return_value,
+                            filter, intern->json, arguments, flags);
+    jv_free(arguments);
 
-    if (!jq_compile_args(state, filter, jv_copy(arguments))) {
-        jv_free(arguments);
-        jq_teardown(&state);
+    if (result != SUCCESS) {
         zend_throw_error(zend_jq_exception_ce,
                          "failed to compile filter string.");
         RETURN_FALSE;
     }
-    jv_free(arguments);
-
-    php_jq_filter(&return_value, state, intern->json, flags);
-
-    jq_teardown(&state);
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_executor_variable, 0, 0, 2)
@@ -607,11 +621,11 @@ ZEND_END_ARG_INFO()
 ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromString)
 {
     char *filter, *text;
-    jq_state *state;
     jv arguments, json;
     size_t filter_len, text_len;
     zend_long flags = 0;
     zval *variables = NULL;
+    int result;
 
     ZEND_PARSE_PARAMETERS_START(2, 4)
         Z_PARAM_STRING(text, text_len)
@@ -637,22 +651,15 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromString)
 
     filter[filter_len] = 0;
 
-    state = php_jq_init();
+    result = php_jq_execute(&return_value, filter, json, arguments, flags);
+    jv_free(json);
+    jv_free(arguments);
 
-    if (!jq_compile_args(state, filter, jv_copy(arguments))) {
-        jv_free(arguments);
-        jv_free(json);
-        jq_teardown(&state);
+    if (result!= SUCCESS) {
         zend_throw_error(zend_jq_exception_ce,
                          "failed to compile filter string.");
         RETURN_FALSE;
     }
-    jv_free(arguments);
-
-    php_jq_filter(&return_value, state, json, flags);
-
-    jv_free(json);
-    jq_teardown(&state);
 }
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_jq_run_fromfile, 0, 0, 2)
@@ -664,11 +671,11 @@ ZEND_END_ARG_INFO()
 ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromFile)
 {
     char *file, *filter;
-    jq_state *state;
     jv arguments, json;
     size_t file_len, filter_len;
     zend_long flags = 0;
     zval *variables = NULL;
+    int result;
 
     ZEND_PARSE_PARAMETERS_START(2, 4)
         Z_PARAM_STRING(file, file_len)
@@ -695,24 +702,17 @@ ZEND_NS_METHOD(##PHP_JQ_NS, Run, fromFile)
         RETURN_FALSE;
     }
 
-    state = php_jq_init();
-
     filter[filter_len] = 0;
 
-    if (!jq_compile_args(state, filter, jv_copy(arguments))) {
-        jv_free(arguments);
-        jv_free(json);
-        jq_teardown(&state);
+    result = php_jq_execute(&return_value, filter, json, arguments, flags);
+    jv_free(json);
+    jv_free(arguments);
+
+    if (result != SUCCESS) {
         zend_throw_error(zend_jq_exception_ce,
                          "failed to compile filter string.");
         RETURN_FALSE;
     }
-    jv_free(arguments);
-
-    php_jq_filter(&return_value, state, json, flags);
-
-    jv_free(json);
-    jq_teardown(&state);
 }
 
 static zend_object *zend_jq_run_new(zend_class_entry *class_type)
